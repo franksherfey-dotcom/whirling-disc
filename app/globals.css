@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Third Man Records-inspired palette */
+  --wd-black: #0d0d0d;
+  --wd-surface: #161616;
+  --wd-surface-2: #1e1e1e;
+  --wd-border: #2a2a2a;
+  --wd-gold: #c9a227;
+  --wd-gold-bright: #e6bd3a;
+  --wd-red: #b02418;
+  --wd-red-bright: #e0503f;
+  --wd-text: #f5f3ee;
+  --wd-text-dim: #a8a29a;
+  --wd-text-faint: #6b665e;
+}
+
+@font-face {
+  font-family: 'PlayfairLocal';
+  src: local('Playfair Display'), local('Georgia');
+}
+
+html, body {
+  background-color: var(--wd-black);
+  color: var(--wd-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-playfair), "Playfair Display", Georgia, serif;
+  font-style: italic;
+  letter-spacing: -0.01em;
+}
+
+.font-eyebrow {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+/* Spinning record loader — replaces the default spinner everywhere */
+@keyframes wd-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.wd-spin {
+  animation: wd-spin 1.4s linear infinite;
+  transform-origin: center;
+}
+
+/* Hero disc spins a touch slower and statelier than the loader */
+.wd-spin-hero {
+  animation: wd-spin 3.2s linear infinite;
+  transform-origin: center;
+}
+
+/* Tonearm drops onto the record once on load, then holds */
+@keyframes wd-tonearm-drop {
+  0% { transform: rotate(-18deg); }
+  70% { transform: rotate(2deg); }
+  85% { transform: rotate(-1deg); }
+  100% { transform: rotate(0deg); }
+}
+.wd-tonearm {
+  transform-origin: 88px 15px; /* pivot at the spindle base, in the 100x100 viewBox */
+  animation: wd-tonearm-drop 1.6s cubic-bezier(0.25, 1, 0.5, 1) 0.3s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wd-spin { animation-duration: 4s; }
+  .wd-spin-hero { animation: none; }
+  .wd-tonearm { animation: none; transform: rotate(0deg); }
+}
+
+/* Gold focus ring */
+.wd-input:focus {
+  outline: none;
+  border-color: var(--wd-gold);
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.15);
+}
+
+/* Hide horizontal scrollbar on the nav while keeping it swipeable */
+.whirl-nav-scroll::-webkit-scrollbar { display: none; }
+.whirl-nav-scroll { -ms-overflow-style: none; }
