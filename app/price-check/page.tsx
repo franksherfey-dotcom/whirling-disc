@@ -10,10 +10,11 @@ import { CameraCapture } from "../components/CameraCapture";
 
 const usd = (c?: number | null) => (c == null ? "—" : `$${Math.round(c / 100).toLocaleString()}`);
 
-type Slot = "front" | "back";
+type Slot = "front" | "back" | "deadwax";
 const SLOTS: { key: Slot; title: string; hint: string }[] = [
   { key: "front", title: "Front cover", hint: "The album art" },
   { key: "back", title: "Back cover", hint: "Tracklist & credits" },
+  { key: "deadwax", title: "Etched numbers (optional)", hint: "Tiny text next to the label, Side A" },
 ];
 
 async function fileToDataUrl(file: File): Promise<string> {
@@ -69,9 +70,10 @@ export default function PriceCheckPage() {
   const [cameraSlot, setCameraSlot] = useState<null | Slot>(null);
   const router = useRouter();
 
-  const slotMeta: Record<Slot, { title: string; guide: "circle" | "square" }> = {
+  const slotMeta: Record<Slot, { title: string; guide: "circle" | "square" | "band" }> = {
     front: { title: "Front cover", guide: "square" },
     back: { title: "Back cover", guide: "square" },
+    deadwax: { title: "Etched numbers near the label", guide: "band" },
   };
 
   const handleCapture = (dataUrl: string) => {
@@ -91,7 +93,7 @@ export default function PriceCheckPage() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ front: photos.front, back: photos.back }),
+        body: JSON.stringify({ front: photos.front, back: photos.back, deadwax: photos.deadwax || undefined }),
       });
       const ai = await res.json();
       if (!res.ok) throw new Error(ai?.error || "Couldn't read that record.");
@@ -123,9 +125,10 @@ export default function PriceCheckPage() {
         collectionId = created.id;
       }
 
-      const [coverUrl, backUrl] = await Promise.all([
+      const [coverUrl, backUrl, deadwaxUrl] = await Promise.all([
         photos.front ? uploadPhoto(user.id, "front", photos.front) : Promise.resolve(undefined),
         photos.back ? uploadPhoto(user.id, "back", photos.back) : Promise.resolve(undefined),
+        photos.deadwax ? uploadPhoto(user.id, "deadwax", photos.deadwax) : Promise.resolve(undefined),
       ]);
 
       const mediaAvg = averageGrades(result.media_condition_a, result.media_condition_b);
@@ -159,6 +162,7 @@ export default function PriceCheckPage() {
         pressing_details: result.pressing_details ?? null,
         cover_url: coverUrl,
         back_url: backUrl,
+        deadwax_url: deadwaxUrl ?? null,
       }]);
       if (insErr) throw new Error(insErr.message);
       router.push("/records");
@@ -185,17 +189,22 @@ export default function PriceCheckPage() {
         <CameraCapture
           title={slotMeta[cameraSlot].title}
           guide={slotMeta[cameraSlot].guide}
-          subject="cover"
+          subject={cameraSlot === "deadwax" ? "deadwax" : "cover"}
           onCapture={handleCapture}
           onCancel={() => setCameraSlot(null)}
         />
       )}
-      <p className="font-eyebrow text-xs mb-2" style={{ color: "var(--wd-text-faint)" }}>Out shopping</p>
-      <h1 className="font-display text-4xl mb-2" style={{ color: "var(--wd-text)" }}>Price check</h1>
-      <p className="text-sm mb-8" style={{ color: "var(--wd-text-dim)" }}>
-        Just snap the front and back covers for a quick value while you're shopping. The disc's actual
-        condition inside sets the final price — this assumes it's clean. Nothing is saved unless you add it to your crate.
+      <p className="font-eyebrow text-xs mb-2" style={{ color: "var(--wd-red-bright, #e0503f)" }}>Out shopping · Nothing gets saved</p>
+      <h1 className="font-display text-4xl mb-2" style={{ color: "var(--wd-text)" }}>Quick price</h1>
+      <p className="text-sm mb-3" style={{ color: "var(--wd-text-dim)" }}>
+        Snap the front and back covers for a quick value while you're shopping. The disc's actual
+        condition inside sets the final price, so this assumes it's clean.
       </p>
+      <div className="px-4 py-3 rounded-xl mb-6 text-xs leading-relaxed" style={{ background: "rgba(176,40,28,0.10)", border: "1px solid rgba(176,40,28,0.35)", color: "var(--wd-text)" }}>
+        This is a look-up, not a save. The estimate disappears when you leave this page unless you tap
+        <span style={{ color: "var(--wd-gold)", fontWeight: 600 }}> Add to my crate</span>. To catalog a record you own, use
+        <a href="/records/add" style={{ color: "var(--wd-gold)", fontWeight: 600 }}> + Add to crate</a> instead.
+      </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {SLOTS.map(({ key, title, hint }) => (
@@ -229,11 +238,14 @@ export default function PriceCheckPage() {
             Check the price
           </button>
           <p className="text-center text-xs mt-3" style={{ color: "var(--wd-text-faint)" }}>
-            Front cover required · back cover optional but improves accuracy
+            Front cover required · back cover optional but improves accuracy · the etched numbers pin down the pressing
           </p>
         </>
       ) : (
         <div className="rounded-2xl p-6" style={{ background: "var(--wd-surface)", border: "1px solid var(--wd-border)" }}>
+          <span className="inline-block font-eyebrow text-[10px] px-3 py-1 rounded-full mb-3" style={{ color: "var(--wd-red-bright, #e0503f)", border: "1px solid rgba(176,40,28,0.5)", background: "rgba(176,40,28,0.12)" }}>
+            Not in your crate
+          </span>
           <h2 className="font-display text-2xl" style={{ color: "var(--wd-text)" }}>{result.title || "Unknown"}</h2>
           <p className="text-sm mb-4" style={{ color: "var(--wd-text-dim)" }}>
             {[result.artist, result.year, result.label, result.rpm ? (result.rpm === "33" ? "33⅓ RPM" : `${result.rpm} RPM`) : null].filter(Boolean).join(" · ") || "—"}
@@ -249,14 +261,15 @@ export default function PriceCheckPage() {
             Estimated for a clean, near-mint copy. Check the vinyl before you buy — scratches, warps, or a
             worn sleeve can lower this. Catalog it with disc photos for a condition-accurate value.
           </div>
-          <div className="flex gap-2">
-            <button onClick={addToCrate} className="flex-1 py-3.5 rounded-2xl font-eyebrow text-xs" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>
-              I bought it — add to crate
-            </button>
-            <button onClick={() => { setResult(null); setPhotos({} as any); }} className="px-5 py-3.5 rounded-2xl font-eyebrow text-xs" style={{ color: "var(--wd-text-dim)", border: "1px solid var(--wd-border)" }}>
-              Check another
-            </button>
-          </div>
+          <button onClick={addToCrate} className="w-full py-4 rounded-2xl font-eyebrow text-sm" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>
+            + Add to my crate
+          </button>
+          <p className="text-center text-[11px] mt-2 mb-3" style={{ color: "var(--wd-text-faint)" }}>
+            Saves this record and its photos. Otherwise it's gone when you leave.
+          </p>
+          <button onClick={() => { setResult(null); setPhotos({} as any); }} className="w-full py-3 rounded-2xl font-eyebrow text-xs" style={{ color: "var(--wd-text-dim)", border: "1px solid var(--wd-border)" }}>
+            Discard and check another
+          </button>
         </div>
       )}
     </div>

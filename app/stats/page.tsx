@@ -92,7 +92,7 @@ function buildFacts(records: VinylRecord[]): Fact[] {
   }
   const needDeadwax = records.filter((r) => r.pressing_details?.uncertainty && !r.deadwax_url);
   if (needDeadwax.length >= 1) {
-    facts.push({ text: `${needDeadwax.length} of your records could be worth more — add a deadwax photo to pin down the pressing and tighten the value.` });
+    facts.push({ text: `${needDeadwax.length} of your records could be worth more — photograph the etched numbers next to the label to pin down the pressing and tighten the value.` });
   }
 
   // Label loyalty
@@ -142,7 +142,7 @@ export default function StatsPage() {
       <div className="max-w-md mx-auto py-20 text-center">
         <h1 className="font-display text-3xl mb-3" style={{ color: "var(--wd-text)" }}>No stats yet</h1>
         <p className="text-sm mb-6" style={{ color: "var(--wd-text-dim)" }}>Catalog a few records and your collection stats will show up here.</p>
-        <Link href="/records/add" className="inline-block px-6 py-3 rounded-full font-eyebrow text-xs" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>+ Catalog a record</Link>
+        <Link href="/records/add" className="inline-block px-6 py-3 rounded-full font-eyebrow text-xs" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>+ Add a record to your crate</Link>
       </div>
     );
   }

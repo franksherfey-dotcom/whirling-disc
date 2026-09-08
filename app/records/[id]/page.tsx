@@ -118,10 +118,9 @@ export default function RecordDetailPage() {
     <div className="max-w-2xl mx-auto">
       {deadwaxCamera && (
         <CameraCapture
-          title="Deadwax / matrix — the etched area near the label"
-          guide="square"
-          subject="disc"
-          autoSnap={false}
+          title="Etched numbers near the label"
+          guide="band"
+          subject="deadwax"
           onCapture={captureDeadwaxAndTighten}
           onCancel={() => setDeadwaxCamera(false)}
         />
@@ -214,8 +213,13 @@ export default function RecordDetailPage() {
           {/* No deadwax photo yet + still uncertain → invite one */}
           {rec.pressing_details.uncertainty && !rec.deadwax_url && (
             <button onClick={() => setDeadwaxCamera(true)} disabled={reappraising} className="w-full mt-3 py-3 rounded-xl font-eyebrow text-xs flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>
-              {reappraising ? "Reading the matrix…" : "📷 Add a deadwax photo to tighten this value"}
+              {reappraising ? "Reading the etched numbers…" : "📷 Photograph the etched numbers to tighten this value"}
             </button>
+          )}
+          {rec.pressing_details.uncertainty && !rec.deadwax_url && (
+            <p className="mt-2 text-[11px]" style={{ color: "var(--wd-text-faint)" }}>
+              One photo, Side A only: the tiny text scratched into the smooth ring between the last track and the label (collectors call it the deadwax). Bright light from the side makes it readable.
+            </p>
           )}
           {/* Deadwax photo exists but it's STILL uncertain → the photo wasn't legible, prompt a retake */}
           {rec.pressing_details.uncertainty && rec.deadwax_url && (
@@ -223,18 +227,18 @@ export default function RecordDetailPage() {
               <div className="flex items-center gap-3 mb-3">
                 <img src={rec.deadwax_url} alt="deadwax" className="rounded-lg object-cover flex-shrink-0" style={{ width: 56, height: 56, border: "1px solid rgba(176,40,28,0.4)" }} />
                 <p className="text-xs leading-relaxed" style={{ color: "#f0a89f" }}>
-                  We couldn't read the matrix in your deadwax photo. Get closer, fill the frame with the etched
-                  numbers, and use good light — reflections and blur are the usual culprits.
+                  We couldn't read the etched numbers in that photo. Get closer, fill the strip with the text,
+                  and light it from the side so the etching casts a shadow. Reflections and blur are the usual culprits.
                 </p>
               </div>
               <button onClick={() => setDeadwaxCamera(true)} disabled={reappraising} className="w-full py-3 rounded-xl font-eyebrow text-xs flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>
-                {reappraising ? "Reading the matrix…" : "📷 Retake the deadwax photo"}
+                {reappraising ? "Reading the etched numbers…" : "📷 Retake the etched numbers"}
               </button>
             </div>
           )}
           {/* Resolved: deadwax on file AND no remaining uncertainty */}
           {rec.deadwax_url && !rec.pressing_details.uncertainty && (
-            <p className="text-[11px] mt-3" style={{ color: "var(--wd-gold)" }}>✓ Confirmed from your deadwax photo — this value reflects the matrix reading.</p>
+            <p className="text-[11px] mt-3" style={{ color: "var(--wd-gold)" }}>✓ Confirmed from the etched numbers. This value reflects the matrix reading.</p>
           )}
         </div>
       )}

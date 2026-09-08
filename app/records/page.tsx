@@ -185,7 +185,7 @@ export default function RecordsPage() {
         <div className="rounded-3xl p-14 text-center flex flex-col items-center" style={{ background: "var(--wd-surface)", border: "1px solid var(--wd-border)" }}>
           <Record size={64} />
           <p className="mt-6 mb-6" style={{ color: "var(--wd-text-dim)" }}>
-            {records.length === 0 ? "Your crate is empty. Snap photos to add your first record." : "No records match those filters."}
+            {records.length === 0 ? "Your crate is empty. Tap + Add to crate to photograph and save your first record. (Quick Price estimates aren't saved.)" : "No records match those filters."}
           </p>
           {records.length === 0 && (
             <Link href="/records/add" className="px-6 py-3 rounded-full font-eyebrow text-xs" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>Add Your First Record</Link>

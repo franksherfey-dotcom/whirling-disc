@@ -52,14 +52,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <a href="/share" className="font-eyebrow text-xs px-4 py-2 rounded-full whitespace-nowrap flex-shrink-0" style={{ color: "var(--wd-text-dim)", border: "1px solid var(--wd-border)" }}>
                   Share
                 </a>
-                <a href="/price-check" className="font-eyebrow text-xs px-4 py-2 rounded-full whitespace-nowrap flex-shrink-0" style={{ color: "var(--wd-red-bright, #e0503f)", border: "1px solid var(--wd-red, #b02418)", background: "rgba(176,40,28,0.12)" }}>
-                  Price Check
+                <a href="/price-check" title="A quick estimate while shopping. Nothing is saved." className="font-eyebrow text-xs px-4 py-2 rounded-full whitespace-nowrap flex-shrink-0" style={{ color: "var(--wd-red-bright, #e0503f)", border: "1px solid var(--wd-red, #b02418)", background: "rgba(176,40,28,0.12)" }}>
+                  🔍 Quick Price
                 </a>
                 <a href="/report" className="font-eyebrow text-xs px-4 py-2 rounded-full whitespace-nowrap flex-shrink-0" style={{ color: "var(--wd-text-dim)", border: "1px solid var(--wd-border)" }}>
                   Insure
                 </a>
-                <a href="/records/add" className="font-eyebrow text-xs px-4 py-2 rounded-full whitespace-nowrap flex-shrink-0" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>
-                  + Catalog
+                <a href="/records/add" title="Photograph a record and save it to your crate." className="font-eyebrow text-xs px-4 py-2 rounded-full whitespace-nowrap flex-shrink-0" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>
+                  + Add to crate
                 </a>
               </div>
             </div>

@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     { role: "back cover", src: imageSource(body.back) },
     { role: "disc side A", src: imageSource(body.side_a) },
     { role: "disc side B", src: imageSource(body.side_b) },
-    { role: "deadwax / matrix close-up (the etched runout area between the last groove and the label — READ THE MATRIX NUMBERS HERE to pin down the exact pressing)", src: imageSource(body.deadwax) },
+    { role: "deadwax / matrix close-up of SIDE A (side 1) of the first disc (the etched runout area between the last groove and the label — READ THE MATRIX NUMBERS HERE to pin down the exact pressing; this is the only runout photo the product ever collects, so never ask for Side B, and if Side A alone narrows it to a group of similarly priced pressings, commit to that group)", src: imageSource(body.deadwax) },
   ].filter((i) => i.src);
 
   if (images.length === 0) {
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
       '    "matrix_runout": string | null (any matrix/runout/deadwax text you can read, or null),\n' +
       '    "country_of_pressing": string | null,\n' +
       '    "distinguishing_marks": string | null (rights-society stamps, label variations, plant marks that pin down the pressing),\n' +
-      '    "uncertainty": string | null (if you could NOT narrow to one pressing, name what is ambiguous and what photo would resolve it — e.g. "a clear shot of the deadwax matrix would confirm first vs second pressing"; null if confident)\n' +
+      '    "uncertainty": string | null (if you could NOT narrow to one pressing, name what is ambiguous and what would resolve it — e.g. "a clear close-up of the etched matrix numbers next to the label on Side A would confirm first vs second pressing"; only ever ask for the Side A runout, never Side B; null if confident)\n' +
       '  }\n' +
       "}\n" +
       "Grade sleeve condition from the cover photos. If a disc side photo is missing, set that side to null. " +

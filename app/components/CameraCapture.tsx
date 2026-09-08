@@ -4,11 +4,13 @@ import { useEffect, useRef, useState, useCallback } from "react";
 
 type Props = {
   title: string;               // e.g. "Front cover" or "Disc — Side A"
-  guide?: "circle" | "square"; // framing guide shape
-  subject?: "cover" | "disc";  // tunes auto-snap: covers (esp. text-heavy backs) are more lenient
+  guide?: "circle" | "square" | "band"; // framing guide shape; "band" is a wide strip for the runout etching
+  subject?: "cover" | "disc" | "deadwax"; // tunes auto-snap: covers are lenient, discs need to fill the frame,
+                                          // deadwax waits for the etched text to come into sharp focus
   onCapture: (dataUrl: string) => void;
   onCancel: () => void;
   autoSnap?: boolean;          // attempt auto-capture when a subject is detected
+  hint?: string;               // replaces the default footer instruction
 };
 
 // Downscale a captured frame to keep uploads/AI happy.
@@ -22,7 +24,7 @@ function canvasToJpeg(canvas: HTMLCanvasElement, maxEdge = 1600, quality = 0.85)
   return out.toDataURL("image/jpeg", quality);
 }
 
-export function CameraCapture({ title, guide = "square", subject = "cover", onCapture, onCancel, autoSnap = true }: Props) {
+export function CameraCapture({ title, guide = "square", subject = "cover", onCapture, onCancel, autoSnap = true, hint }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const analyzeCanvas = useRef<HTMLCanvasElement | null>(null);
@@ -33,6 +35,7 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
   const capturedRef = useRef(false);
   const stableFramesRef = useRef(0);
   const lastMetricRef = useRef<number | null>(null);
+  const peakSharpRef = useRef(0); // deadwax: running peak of sharpness, decays slowly
 
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -47,10 +50,11 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext("2d")!.drawImage(video, 0, 0);
-    const jpeg = canvasToJpeg(canvas);
+    // Etched characters are tiny; keep more pixels so the model can read them.
+    const jpeg = canvasToJpeg(canvas, subject === "deadwax" ? 2048 : 1600, subject === "deadwax" ? 0.9 : 0.85);
     stop();
     onCapture(jpeg);
-  }, [onCapture, stop]);
+  }, [onCapture, stop, subject]);
 
   // Start the camera.
   useEffect(() => {
@@ -85,13 +89,28 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
             await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
           }
         } catch { /* not supported — the OS still does its own AF */ }
+        // For the runout etching, ask for a modest zoom so the text fills the
+        // band without the lens going closer than it can focus.
+        if (subject === "deadwax") {
+          try {
+            // @ts-ignore
+            const caps = track.getCapabilities?.() || {};
+            // @ts-ignore
+            if (caps.zoom && typeof caps.zoom.max === "number") {
+              // @ts-ignore
+              const z = Math.min(caps.zoom.max, Math.max(caps.zoom.min || 1, 2));
+              // @ts-ignore
+              await track.applyConstraints({ advanced: [{ zoom: z }] });
+            }
+          } catch { /* zoom not supported; the user can move the phone in */ }
+        }
         setReady(true);
       } catch (e) {
         setError("Couldn't access the camera. Check camera permission for this site in your browser settings, then reload.");
       }
     })();
     return () => { cancelled = true; stop(); };
-  }, [stop]);
+  }, [stop, subject]);
 
   // Auto-snap loop: sample the center region; when it's bright, detailed, and
   // stable for a few frames, capture. This is a heuristic, not true object
@@ -99,13 +118,63 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
   useEffect(() => {
     if (!ready || !autoOn) { setHoldPct(0); stableFramesRef.current = 0; return; }
     let raf = 0;
-    const NEEDED = subject === "cover" ? 16 : 30; // covers snap quicker (~0.6s vs ~1.1s)
+    const NEEDED = subject === "cover" ? 16 : subject === "deadwax" ? 22 : 30; // covers ~0.6s, deadwax ~0.8s, discs ~1.1s
 
     const tick = () => {
       const video = videoRef.current;
       if (!video || capturedRef.current) return;
       if (!analyzeCanvas.current) analyzeCanvas.current = document.createElement("canvas");
       const c = analyzeCanvas.current;
+
+      if (subject === "deadwax") {
+        // Sharpness detector. The etching is a focus problem, not a framing
+        // problem: sample the band the guide covers, measure mean gradient in
+        // both directions, and snap once focus has settled at (near) its peak
+        // and held there. A flat, blurry, or hunting frame never qualifies.
+        const W = 96, H = 32;
+        c.width = W; c.height = H;
+        const ctx = c.getContext("2d", { willReadFrequently: true })!;
+        const bw = video.videoWidth * 0.86;
+        const bh = bw / 3;
+        const sx = (video.videoWidth - bw) / 2;
+        const sy = (video.videoHeight - bh) / 2;
+        ctx.drawImage(video, sx, sy, bw, bh, 0, 0, W, H);
+        const { data } = ctx.getImageData(0, 0, W, H);
+        let lum = 0, grad = 0, gN = 0;
+        const L = new Float32Array(W * H);
+        for (let i = 0; i < W * H; i++) {
+          const j = i * 4;
+          L[i] = 0.299 * data[j] + 0.587 * data[j + 1] + 0.114 * data[j + 2];
+          lum += L[i];
+        }
+        lum /= W * H;
+        for (let y = 1; y < H - 1; y++) {
+          for (let x = 1; x < W - 1; x++) {
+            const i = y * W + x;
+            grad += Math.abs(L[i + 1] - L[i - 1]) + Math.abs(L[i + W] - L[i - W]);
+            gN++;
+          }
+        }
+        const sharp = grad / Math.max(1, gN);
+
+        // Track the best focus seen so far; decay so a transient spike doesn't
+        // hold the bar unreachably high after the phone moves.
+        peakSharpRef.current = Math.max(sharp, peakSharpRef.current * 0.985);
+        const SHARP_MIN = 7;                       // below this it's blur or bare vinyl
+        const nearPeak = sharp >= peakSharpRef.current * 0.85;
+        const litEnough = lum > 35 && lum < 235;   // not dark, not blown out by glare
+        const stable = lastMetricRef.current != null && Math.abs(sharp - lastMetricRef.current) < Math.max(1, sharp * 0.12);
+        lastMetricRef.current = sharp;
+
+        if (sharp > SHARP_MIN && nearPeak && litEnough && stable) stableFramesRef.current += 1;
+        else stableFramesRef.current = Math.max(0, stableFramesRef.current - 2);
+
+        setHoldPct(Math.min(100, Math.round((stableFramesRef.current / NEEDED) * 100)));
+        if (stableFramesRef.current >= NEEDED) { capture(); return; }
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+
       const S = 64; // small sample of the guide region
       c.width = S; c.height = S;
       const ctx = c.getContext("2d", { willReadFrequently: true })!;
@@ -186,17 +255,17 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div
               style={{
-                width: "78%",
-                aspectRatio: "1 / 1",
+                width: guide === "band" ? "86%" : "78%",
+                aspectRatio: guide === "band" ? "3 / 1" : "1 / 1",
                 border: `3px solid ${holdPct > 0 ? "#c9a227" : "rgba(255,255,255,0.7)"}`,
-                borderRadius: guide === "circle" ? "50%" : "18px",
+                borderRadius: guide === "circle" ? "50%" : guide === "band" ? "14px" : "18px",
                 boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)",
                 transition: "border-color 0.15s",
               }}
             />
             {autoOn && holdPct > 0 && (
               <div className="absolute bottom-24 font-eyebrow text-xs px-3 py-1.5 rounded-full" style={{ background: "rgba(0,0,0,0.6)", color: "#c9a227" }}>
-                Hold steady… {holdPct}%
+                {subject === "deadwax" ? "Focusing… " : "Hold steady… "}{holdPct}%
               </div>
             )}
           </div>
@@ -224,7 +293,11 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
         />
       </div>
       <p className="text-center pb-6 font-eyebrow text-[10px]" style={{ background: "#000", color: "#666" }}>
-        {autoOn ? "Fill the frame with the record and hold steady — it snaps on its own, or tap the shutter." : "Line it up and tap the shutter."}
+        {hint
+          ? hint
+          : subject === "deadwax"
+          ? (autoOn ? "Fill the box with the tiny etched text next to the label. Hold still; it snaps when the text is sharp, or tap the shutter." : "Fill the box with the tiny etched text next to the label and tap the shutter.")
+          : autoOn ? "Fill the frame with the record and hold steady — it snaps on its own, or tap the shutter." : "Line it up and tap the shutter."}
       </p>
     </div>
   );

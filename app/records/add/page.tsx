@@ -66,6 +66,9 @@ export default function AddRecordPage() {
   const [discCount, setDiscCount] = useState(1);
   const [front, setFront] = useState<string | null>(null);
   const [back, setBack] = useState<string | null>(null);
+  // Optional close-up of the runout etching. Lets the AI commit to one pressing
+  // up front instead of flagging uncertainty and asking for it later.
+  const [deadwax, setDeadwax] = useState<string | null>(null);
   // Disc photos: 2 per disc, indexed [disc0sideA, disc0sideB, disc1sideA, disc1sideB, ...]
   const [discPhotos, setDiscPhotos] = useState<Record<number, string>>({});
   const [status, setStatus] = useState<"idle" | "analyzing" | "saving">("idle");
@@ -93,12 +96,13 @@ export default function AddRecordPage() {
   const totalDiscSlots = discCount * 2;
 
   // Which slot the live camera is capturing for: 'front', 'back', or a disc index.
-  const [cameraTarget, setCameraTarget] = useState<null | { kind: "front" | "back" | "disc"; idx?: number; title: string; guide: "circle" | "square" }>(null);
+  const [cameraTarget, setCameraTarget] = useState<null | { kind: "front" | "back" | "disc" | "deadwax"; idx?: number; title: string; guide: "circle" | "square" | "band" }>(null);
 
   const handleCapture = (dataUrl: string) => {
     if (!cameraTarget) return;
     if (cameraTarget.kind === "front") setFront(dataUrl);
     else if (cameraTarget.kind === "back") setBack(dataUrl);
+    else if (cameraTarget.kind === "deadwax") setDeadwax(dataUrl);
     else if (cameraTarget.kind === "disc" && cameraTarget.idx != null) {
       const idx = cameraTarget.idx;
       setDiscPhotos((p) => ({ ...p, [idx]: dataUrl }));
@@ -139,7 +143,7 @@ export default function AddRecordPage() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ front, back, side_a: firstDiscA, side_b: firstDiscB }),
+        body: JSON.stringify({ front, back, side_a: firstDiscA, side_b: firstDiscB, deadwax: deadwax || undefined }),
       });
       const ai = await res.json();
       if (!res.ok) throw new Error(ai?.error || "Could not value this record.");
@@ -148,9 +152,10 @@ export default function AddRecordPage() {
       const collectionId = await getOrCreateCollectionId(user.id);
 
       // Upload covers + every disc photo.
-      const [coverUrl, backUrl] = await Promise.all([
+      const [coverUrl, backUrl, deadwaxUrl] = await Promise.all([
         front ? uploadPhoto(user.id, "front", front) : Promise.resolve(undefined),
         back ? uploadPhoto(user.id, "back", back) : Promise.resolve(undefined),
+        deadwax ? uploadPhoto(user.id, "deadwax", deadwax) : Promise.resolve(undefined),
       ]);
       const discUrls: string[] = [];
       for (let i = 0; i < totalDiscSlots; i++) {
@@ -196,6 +201,7 @@ export default function AddRecordPage() {
         side_a_url: discUrls[0],
         side_b_url: discUrls[1],
         disc_photo_urls: discUrls.length ? discUrls : null,
+        deadwax_url: deadwaxUrl ?? null,
       }]);
       if (insErr) {
         if (insErr.message.includes("FREE_LIMIT_REACHED")) {
@@ -262,12 +268,12 @@ export default function AddRecordPage() {
         <CameraCapture
           title={cameraTarget.title}
           guide={cameraTarget.guide}
-          subject={cameraTarget.kind === "disc" ? "disc" : "cover"}
+          subject={cameraTarget.kind === "deadwax" ? "deadwax" : cameraTarget.kind === "disc" ? "disc" : "cover"}
           onCapture={handleCapture}
           onCancel={() => setCameraTarget(null)}
         />
       )}
-      <p className="font-eyebrow text-xs mb-2" style={{ color: "var(--wd-text-faint)" }}>Catalog a record</p>
+      <p className="font-eyebrow text-xs mb-2" style={{ color: "var(--wd-gold)" }}>Add to crate · Saves to your collection</p>
       <h1 className="font-display text-4xl mb-2" style={{ color: "var(--wd-text)" }}>Photograph it</h1>
       <p className="text-sm mb-6" style={{ color: "var(--wd-text-dim)" }}>
         Set how many discs are in the release, then photograph both sides of each one, plus the covers.
@@ -311,6 +317,23 @@ export default function AddRecordPage() {
           />
         ))}
       </div>
+
+      {/* Etched numbers — optional, but it is what lets the value commit to one pressing */}
+      <p className="font-eyebrow text-[11px] mb-3" style={{ color: "var(--wd-text-faint)" }}>Etched numbers (optional)</p>
+      <div className="grid grid-cols-2 gap-4 mb-2">
+        <PhotoTile
+          url={deadwax}
+          title="Etched numbers, Side A"
+          hint="The tiny text next to the label"
+          onClick={() => setCameraTarget({ kind: "deadwax", title: "Etched numbers near the label", guide: "band" })}
+        />
+        <div className="rounded-2xl p-4 text-xs leading-relaxed" style={{ background: "var(--wd-surface)", border: "1px dashed var(--wd-border)", color: "var(--wd-text-dim)" }}>
+          Look at the smooth ring between the last track and the label on Side A. The tiny scratched-in codes there
+          (collectors call it the deadwax) are what separate a first pressing from a reissue. One photo, bright light
+          from the side, and we can commit to a pressing and a tighter value. Skip it and you can add it later.
+        </div>
+      </div>
+      <div className="mb-6" />
 
       {error === "SIGNED_OUT" ? (
         <div className="px-4 py-4 rounded-xl mb-4 text-sm text-center" style={{ background: "rgba(201,162,39,0.1)", border: "1px solid var(--wd-gold)", color: "var(--wd-text)" }}>
