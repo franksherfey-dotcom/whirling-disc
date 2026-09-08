@@ -118,8 +118,8 @@ export default function RecordDetailPage() {
     <div className="max-w-2xl mx-auto">
       {deadwaxCamera && (
         <CameraCapture
-          title="Etched numbers near the label"
-          guide="band"
+          title="Label close-up"
+          guide="circle"
           subject="deadwax"
           onCapture={captureDeadwaxAndTighten}
           onCancel={() => setDeadwaxCamera(false)}
@@ -218,7 +218,7 @@ export default function RecordDetailPage() {
           )}
           {rec.pressing_details.uncertainty && !rec.deadwax_url && (
             <p className="mt-2 text-[11px]" style={{ color: "var(--wd-text-faint)" }}>
-              One photo, Side A only: the tiny text scratched into the smooth ring between the last track and the label (collectors call it the deadwax). Bright light from the side makes it readable.
+              Same as the disc photo, just closer: fit the Side A label inside the circle. The etched numbers live in the smooth ring right around the label, so they end up in the shot on their own. Bright light from the side helps.
             </p>
           )}
           {/* Deadwax photo exists but it's STILL uncertain → the photo wasn't legible, prompt a retake */}
@@ -227,8 +227,8 @@ export default function RecordDetailPage() {
               <div className="flex items-center gap-3 mb-3">
                 <img src={rec.deadwax_url} alt="deadwax" className="rounded-lg object-cover flex-shrink-0" style={{ width: 56, height: 56, border: "1px solid rgba(176,40,28,0.4)" }} />
                 <p className="text-xs leading-relaxed" style={{ color: "#f0a89f" }}>
-                  We couldn't read the etched numbers in that photo. Get closer, fill the strip with the text,
-                  and light it from the side so the etching casts a shadow. Reflections and blur are the usual culprits.
+                  We couldn't read the etched numbers in that photo. Fit the label inside the circle, hold still until
+                  it snaps, and light it from the side so the etching casts a shadow. Reflections and blur are the usual culprits.
                 </p>
               </div>
               <button onClick={() => setDeadwaxCamera(true)} disabled={reappraising} className="w-full py-3 rounded-xl font-eyebrow text-xs flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>

@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     { role: "back cover", src: imageSource(body.back) },
     { role: "disc side A", src: imageSource(body.side_a) },
     { role: "disc side B", src: imageSource(body.side_b) },
-    { role: "deadwax / matrix close-up of SIDE A (side 1) of the first disc (the etched runout area between the last groove and the label — READ THE MATRIX NUMBERS HERE to pin down the exact pressing; this is the only runout photo the product ever collects, so never ask for Side B, and if Side A alone narrows it to a group of similarly priced pressings, commit to that group)", src: imageSource(body.deadwax) },
+    { role: "close-up of the SIDE A (side 1) label of the first disc, framed so the label fills the centre and the smooth runout ring around it is visible. THE MATRIX / DEADWAX TEXT IS IN THAT SMOOTH RING JUST OUTSIDE THE LABEL EDGE: scan the full circumference of the ring, including upside-down text, and READ THE MATRIX NUMBERS THERE to pin down the exact pressing. This is the only runout photo the product ever collects, so never ask for Side B; if Side A alone narrows it to a group of similarly priced pressings, commit to that group", src: imageSource(body.deadwax) },
   ].filter((i) => i.src);
 
   if (images.length === 0) {

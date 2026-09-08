@@ -323,14 +323,14 @@ export default function AddRecordPage() {
       <div className="grid grid-cols-2 gap-4 mb-2">
         <PhotoTile
           url={deadwax}
-          title="Etched numbers, Side A"
-          hint="The tiny text next to the label"
-          onClick={() => setCameraTarget({ kind: "deadwax", title: "Etched numbers near the label", guide: "band" })}
+          title="Label close-up, Side A"
+          hint="Fit the label in the circle"
+          onClick={() => setCameraTarget({ kind: "deadwax", title: "Label close-up", guide: "circle" })}
         />
         <div className="rounded-2xl p-4 text-xs leading-relaxed" style={{ background: "var(--wd-surface)", border: "1px dashed var(--wd-border)", color: "var(--wd-text-dim)" }}>
-          Look at the smooth ring between the last track and the label on Side A. The tiny scratched-in codes there
-          (collectors call it the deadwax) are what separate a first pressing from a reissue. One photo, bright light
-          from the side, and we can commit to a pressing and a tighter value. Skip it and you can add it later.
+          Same as the disc photo, just closer: fit the Side A label inside the circle. The tiny codes scratched into the
+          ring around the label (collectors call it the deadwax) come along automatically, and they're what separate a
+          first pressing from a reissue. Skip it and you can add it later.
         </div>
       </div>
       <div className="mb-6" />

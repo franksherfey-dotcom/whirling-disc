@@ -6,7 +6,7 @@ type Props = {
   title: string;               // e.g. "Front cover" or "Disc — Side A"
   guide?: "circle" | "square" | "band"; // framing guide shape; "band" is a wide strip for the runout etching
   subject?: "cover" | "disc" | "deadwax"; // tunes auto-snap: covers are lenient, discs need to fill the frame,
-                                          // deadwax waits for the etched text to come into sharp focus
+                                          // deadwax = the label filling the circle, so the etched ring around it is in shot
   onCapture: (dataUrl: string) => void;
   onCancel: () => void;
   autoSnap?: boolean;          // attempt auto-capture when a subject is detected
@@ -107,21 +107,6 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
             await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
           }
         } catch { /* not supported — the OS still does its own AF */ }
-        // For the runout etching, ask for a modest zoom so the text fills the
-        // band without the lens going closer than it can focus.
-        if (subject === "deadwax") {
-          try {
-            // @ts-ignore
-            const caps = track.getCapabilities?.() || {};
-            // @ts-ignore
-            if (caps.zoom && typeof caps.zoom.max === "number") {
-              // @ts-ignore
-              const z = Math.min(caps.zoom.max, Math.max(caps.zoom.min || 1, 2));
-              // @ts-ignore
-              await track.applyConstraints({ advanced: [{ zoom: z }] });
-            }
-          } catch { /* zoom not supported; the user can move the phone in */ }
-        }
         startedAtRef.current = performance.now();
         setReady(true);
       } catch (e) {
@@ -137,8 +122,8 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
   useEffect(() => {
     if (!ready || !autoOn) { setHoldPct(0); stableFramesRef.current = 0; return; }
     let raf = 0;
-    const NEEDED = subject === "cover" ? 16 : subject === "deadwax" ? 45 : 30; // covers ~0.6s, deadwax ~1.5s, discs ~1.1s
-    const WARMUP_MS = subject === "deadwax" ? 1800 : 0; // give macro autofocus time to settle before we trust sharpness
+    const NEEDED = subject === "cover" ? 16 : subject === "deadwax" ? 36 : 30; // covers ~0.6s, deadwax ~1.2s, discs ~1.1s
+    const WARMUP_MS = subject === "deadwax" ? 1200 : 0; // let close-range autofocus settle before counting
 
     const tick = () => {
       const video = videoRef.current;
@@ -147,51 +132,38 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
       const c = analyzeCanvas.current;
 
       if (subject === "deadwax") {
+        // Label-in-the-circle detector. The user frames the LABEL (printed,
+        // high contrast, easy to lock onto); the etched runout ring lands in
+        // the shot on its own. We want: the circle full of printed detail,
+        // the frame lit but not blown out, held still after autofocus settles.
         if (performance.now() - startedAtRef.current < WARMUP_MS) { raf = requestAnimationFrame(tick); return; }
-        // Sharpness detector. The etching is a focus problem, not a framing
-        // problem: sample the band the guide covers, measure mean gradient in
-        // both directions, and snap once focus has settled at (near) its peak
-        // and held there. A flat, blurry, or hunting frame never qualifies.
-        const W = 96, H = 32;
-        c.width = W; c.height = H;
+        const S = 64;
+        c.width = S; c.height = S;
         const ctx = c.getContext("2d", { willReadFrequently: true })!;
-        const bw = video.videoWidth * 0.86;
-        const bh = bw / 3;
-        const sx = (video.videoWidth - bw) / 2;
-        const sy = (video.videoHeight - bh) / 2;
-        ctx.drawImage(video, sx, sy, bw, bh, 0, 0, W, H);
-        const { data } = ctx.getImageData(0, 0, W, H);
-        let lum = 0, grad = 0, gN = 0;
-        const L = new Float32Array(W * H);
-        for (let i = 0; i < W * H; i++) {
-          const j = i * 4;
-          L[i] = 0.299 * data[j] + 0.587 * data[j + 1] + 0.114 * data[j + 2];
-          lum += L[i];
-        }
-        lum /= W * H;
-        for (let y = 1; y < H - 1; y++) {
-          for (let x = 1; x < W - 1; x++) {
-            const i = y * W + x;
-            grad += Math.abs(L[i + 1] - L[i - 1]) + Math.abs(L[i + W] - L[i - W]);
-            gN++;
+        const side = Math.min(video.videoWidth, video.videoHeight) * 0.78;
+        const sx = (video.videoWidth - side) / 2;
+        const sy = (video.videoHeight - side) / 2;
+        ctx.drawImage(video, sx, sy, side, side, 0, 0, S, S);
+        const { data } = ctx.getImageData(0, 0, S, S);
+        let lum = 0, edge = 0, prev = 0, n = 0;
+        const mid = S / 2, r = S * 0.46;
+        for (let y = 0; y < S; y++) {
+          for (let x = 0; x < S; x++) {
+            const i = (y * S + x) * 4;
+            const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            const d = Math.abs(l - prev); prev = l;
+            if (Math.hypot(x - mid, y - mid) < r) { lum += l; edge += d; n++; }
           }
         }
-        const sharp = grad / Math.max(1, gN);
-
-        // Track the best focus seen so far; decay so a transient spike doesn't
-        // hold the bar unreachably high after the phone moves.
-        peakSharpRef.current = Math.max(sharp, peakSharpRef.current * 0.985);
-        const SHARP_MIN = 10;                      // below this it's blur or bare vinyl
-        const nearPeak = sharp >= peakSharpRef.current * 0.93; // must be at the best focus we've seen, not merely close
-        const litEnough = lum > 35 && lum < 225;   // not dark, not blown out by glare
-        const stable = lastMetricRef.current != null && Math.abs(sharp - lastMetricRef.current) < Math.max(0.8, sharp * 0.08);
-        lastMetricRef.current = sharp;
-
-        // Any wobble or focus hunt sets the count back hard, so it only fires
-        // after a continuous run of sharp, still frames.
-        if (sharp > SHARP_MIN && nearPeak && litEnough && stable) stableFramesRef.current += 1;
-        else stableFramesRef.current = Math.max(0, stableFramesRef.current - 6);
-
+        lum /= Math.max(1, n);
+        edge /= Math.max(1, n);
+        const detailed = edge > 2.5;                 // a printed label, not bare vinyl or a blur
+        const litEnough = lum > 35 && lum < 225;
+        const metric = lum + edge * 6;
+        const stable = lastMetricRef.current != null && Math.abs(metric - lastMetricRef.current) < 3;
+        lastMetricRef.current = metric;
+        if (detailed && litEnough && stable) stableFramesRef.current += 1;
+        else stableFramesRef.current = Math.max(0, stableFramesRef.current - 4);
         setHoldPct(Math.min(100, Math.round((stableFramesRef.current / NEEDED) * 100)));
         if (stableFramesRef.current >= NEEDED) { capture(); return; }
         raf = requestAnimationFrame(tick);
@@ -269,10 +241,10 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
         </div>
         <div className="relative flex-1 overflow-auto flex items-center justify-center" style={{ WebkitOverflowScrolling: "touch" }}>
           {/* Shown large so the etching is judged at roughly the size the model will see it. Pinch/scroll to inspect. */}
-          <img src={preview} alt="Your shot" style={{ maxWidth: "none", width: "180%", height: "auto" }} />
+          <img src={preview} alt="Your shot" className="w-full h-auto" />
         </div>
         <p className="text-center px-6 pt-4 text-xs leading-relaxed" style={{ background: "#000", color: "#bbb" }}>
-          If you can make out the letters and numbers, so can we. If it's soft or washed out by glare, retake it.
+          Look at the smooth ring just outside the label. If you can make out letters and numbers there (pinch to zoom), so can we. If it's soft or washed out by glare, retake it.
         </p>
         <div className="flex gap-3 px-5 py-6" style={{ background: "#000" }}>
           <button onClick={retake} className="flex-1 py-4 rounded-2xl font-eyebrow text-sm" style={{ color: "#ddd", border: "1px solid #444" }}>
@@ -315,7 +287,7 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
             />
             {autoOn && holdPct > 0 && (
               <div className="absolute bottom-24 font-eyebrow text-xs px-3 py-1.5 rounded-full" style={{ background: "rgba(0,0,0,0.6)", color: "#c9a227" }}>
-                {subject === "deadwax" ? "Focusing… " : "Hold steady… "}{holdPct}%
+                Hold steady… {holdPct}%
               </div>
             )}
           </div>
@@ -346,7 +318,7 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
         {hint
           ? hint
           : subject === "deadwax"
-          ? (autoOn ? "Fill the box with the tiny etched text next to the label and hold still. It snaps once the text stays sharp; you'll get to check it before it's used." : "Fill the box with the tiny etched text next to the label and tap the shutter. You'll get to check it first.")
+          ? (autoOn ? "Same as the disc photo, just closer: fit the label inside the circle and hold still. The etched numbers around the label come along for free." : "Fit the label inside the circle and tap the shutter. The etched numbers around the label come along for free.")
           : autoOn ? "Fill the frame with the record and hold steady — it snaps on its own, or tap the shutter." : "Line it up and tap the shutter."}
       </p>
     </div>

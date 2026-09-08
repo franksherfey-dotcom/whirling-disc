@@ -14,7 +14,7 @@ type Slot = "front" | "back" | "deadwax";
 const SLOTS: { key: Slot; title: string; hint: string }[] = [
   { key: "front", title: "Front cover", hint: "The album art" },
   { key: "back", title: "Back cover", hint: "Tracklist & credits" },
-  { key: "deadwax", title: "Etched numbers (optional)", hint: "Tiny text next to the label, Side A" },
+  { key: "deadwax", title: "Label close-up (optional)", hint: "Fit the Side A label in the circle" },
 ];
 
 async function fileToDataUrl(file: File): Promise<string> {
@@ -73,7 +73,7 @@ export default function PriceCheckPage() {
   const slotMeta: Record<Slot, { title: string; guide: "circle" | "square" | "band" }> = {
     front: { title: "Front cover", guide: "square" },
     back: { title: "Back cover", guide: "square" },
-    deadwax: { title: "Etched numbers near the label", guide: "band" },
+    deadwax: { title: "Label close-up", guide: "circle" },
   };
 
   const handleCapture = (dataUrl: string) => {
