@@ -7,6 +7,7 @@ import { toDbGrade, averageGrades } from "@/lib/conditions";
 import { SOURCE_LABEL } from "@/lib/pricing/blend";
 import { Record } from "../components/Record";
 import { CameraCapture } from "../components/CameraCapture";
+import { DeadwaxCapture } from "../components/DeadwaxCapture";
 
 const usd = (c?: number | null) => (c == null ? "—" : `$${Math.round(c / 100).toLocaleString()}`);
 
@@ -14,7 +15,7 @@ type Slot = "front" | "back" | "deadwax";
 const SLOTS: { key: Slot; title: string; hint: string }[] = [
   { key: "front", title: "Front cover", hint: "The album art" },
   { key: "back", title: "Back cover", hint: "Tracklist & credits" },
-  { key: "deadwax", title: "Label close-up (optional)", hint: "Fit the Side A label in the circle" },
+  { key: "deadwax", title: "Label close-up (optional)", hint: "Side A, with your phone's camera" },
 ];
 
 async function fileToDataUrl(file: File): Promise<string> {
@@ -185,11 +186,14 @@ export default function PriceCheckPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      {cameraSlot && (
+      {cameraSlot === "deadwax" && (
+        <DeadwaxCapture onCapture={handleCapture} onCancel={() => setCameraSlot(null)} />
+      )}
+      {cameraSlot && cameraSlot !== "deadwax" && (
         <CameraCapture
           title={slotMeta[cameraSlot].title}
           guide={slotMeta[cameraSlot].guide}
-          subject={cameraSlot === "deadwax" ? "deadwax" : "cover"}
+          subject="cover"
           onCapture={handleCapture}
           onCancel={() => setCameraSlot(null)}
         />

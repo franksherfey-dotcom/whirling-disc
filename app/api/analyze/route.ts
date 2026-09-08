@@ -3,9 +3,10 @@ import { matchRelease, getDiscogsPricing } from "@/lib/pricing/discogs";
 import { getEbayActive } from "@/lib/pricing/ebay";
 import { blendValue } from "@/lib/pricing/blend";
 import { averageGrades, gradingRubricForPrompt } from "@/lib/conditions";
+import { deadwaxTiles } from "@/lib/deadwaxTiles";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 type Body = {
   front?: string;
@@ -52,10 +53,23 @@ export async function POST(req: NextRequest) {
     { role: "back cover", src: imageSource(body.back) },
     { role: "disc side A", src: imageSource(body.side_a) },
     { role: "disc side B", src: imageSource(body.side_b) },
-    { role: "close-up of the SIDE A (side 1) label of the first disc, framed so the label fills the centre and the smooth runout ring around it is visible. THE MATRIX / DEADWAX TEXT IS IN THAT SMOOTH RING JUST OUTSIDE THE LABEL EDGE: scan the full circumference of the ring, including upside-down text, and READ THE MATRIX NUMBERS THERE to pin down the exact pressing. This is the only runout photo the product ever collects, so never ask for Side B; if Side A alone narrows it to a group of similarly priced pressings, commit to that group", src: imageSource(body.deadwax) },
   ].filter((i) => i.src);
+  const hasDeadwax = !!imageSource(body.deadwax);
 
-  if (images.length === 0) {
+  // The label close-up goes in as an overview plus four magnified quadrants so
+  // the etched matrix text is legible to the model. If tiling fails for any
+  // reason, fall back to the raw image so the request still completes.
+  let deadwaxImages: { role: string; src: any }[] = [];
+  if (hasDeadwax) {
+    try {
+      const tiles = await deadwaxTiles(body.deadwax!);
+      deadwaxImages = tiles.map((t) => ({ role: t.role, src: { type: "base64", media_type: "image/jpeg", data: t.base64 } }));
+    } catch {
+      deadwaxImages = [{ role: "close-up of the Side A label with the runout ring around it; the matrix text is in the smooth ring just outside the label edge", src: imageSource(body.deadwax) }];
+    }
+  }
+
+  if (images.length === 0 && deadwaxImages.length === 0) {
     return NextResponse.json({ error: "No photos provided" }, { status: 400 });
   }
 
@@ -67,6 +81,22 @@ export async function POST(req: NextRequest) {
       source: img.src,
     });
   });
+  if (deadwaxImages.length) {
+    content.push({
+      type: "text",
+      text:
+        "The next images are ONE photo of the SIDE A (side 1) label of the first disc, first as an overview and then as four " +
+        "magnified overlapping quadrants. THE MATRIX / DEADWAX TEXT IS IN THE SMOOTH RING JUST OUTSIDE THE LABEL EDGE. Scan that " +
+        "ring in every quadrant, including text that is upside-down or curves with the ring; stamped characters are often faint. " +
+        "Transcribe what you can read exactly, character by character, into pressing_details.matrix_runout. This is the only " +
+        "runout photo the product ever collects, so never ask for Side B; if Side A alone narrows the identification to a group of " +
+        "similarly priced pressings, commit to that group.",
+    });
+    deadwaxImages.forEach((img) => {
+      content.push({ type: "text", text: `This is the ${img.role}:` });
+      content.push({ type: "image", source: img.src });
+    });
+  }
   content.push({
     type: "text",
     text:

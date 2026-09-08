@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { toDbGrade, averageGrades } from "@/lib/conditions";
 import { Record } from "../../components/Record";
 import { CameraCapture } from "../../components/CameraCapture";
+import { DeadwaxCapture } from "../../components/DeadwaxCapture";
 
 async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((res, rej) => {
@@ -264,11 +265,14 @@ export default function AddRecordPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      {cameraTarget && (
+      {cameraTarget && cameraTarget.kind === "deadwax" && (
+        <DeadwaxCapture onCapture={handleCapture} onCancel={() => setCameraTarget(null)} />
+      )}
+      {cameraTarget && cameraTarget.kind !== "deadwax" && (
         <CameraCapture
           title={cameraTarget.title}
           guide={cameraTarget.guide}
-          subject={cameraTarget.kind === "deadwax" ? "deadwax" : cameraTarget.kind === "disc" ? "disc" : "cover"}
+          subject={cameraTarget.kind === "disc" ? "disc" : "cover"}
           onCapture={handleCapture}
           onCancel={() => setCameraTarget(null)}
         />
@@ -324,13 +328,13 @@ export default function AddRecordPage() {
         <PhotoTile
           url={deadwax}
           title="Label close-up, Side A"
-          hint="Fit the label in the circle"
+          hint="Uses your phone's camera"
           onClick={() => setCameraTarget({ kind: "deadwax", title: "Label close-up", guide: "circle" })}
         />
         <div className="rounded-2xl p-4 text-xs leading-relaxed" style={{ background: "var(--wd-surface)", border: "1px dashed var(--wd-border)", color: "var(--wd-text-dim)" }}>
-          Same as the disc photo, just closer: fit the Side A label inside the circle. The tiny codes scratched into the
-          ring around the label (collectors call it the deadwax) come along automatically, and they're what separate a
-          first pressing from a reissue. Skip it and you can add it later.
+          Opens your phone's camera. Get close so the Side A label fills the screen; the tiny codes scratched into the
+          ring around it (collectors call it the deadwax) are what separate a first pressing from a reissue. Skip it and
+          you can add it later.
         </div>
       </div>
       <div className="mb-6" />
