@@ -14,6 +14,15 @@ type Body = {
   side_a?: string;
   side_b?: string;
   deadwax?: string;
+  // Previous appraisal of this same record, when re-appraising. The model is
+  // told to treat it as the baseline so values do not drift run to run.
+  prior?: {
+    value_low_usd?: number | null;
+    value_high_usd?: number | null;
+    identification?: string | null;
+    matrix_runout?: string | null;
+    summary?: string | null;
+  } | null;
 };
 
 const GRADES = ["M", "NM", "VG+", "VG", "G+", "G", "F", "P"];
@@ -120,6 +129,24 @@ export async function POST(req: NextRequest) {
       "pressing with a TIGHT range (typical dealer spread for that exact pressing/grade). Only widen the " +
       "range when the evidence genuinely can't distinguish between pressings that differ a lot in value — " +
       "and when you widen it, say why in pressing_details.uncertainty. " +
+      "ONLY set pressing_details.uncertainty when reading the runout would actually change the value: that is, when two or more " +
+      "pressings of this release exist that differ meaningfully in price AND the label and cover cannot tell them apart. If the " +
+      "release has a single known pressing (typical of records pressed in roughly the last ten years, small-label one-off " +
+      "pressings, or where the label text already names the plant and year), set uncertainty to null even if the runout is not " +
+      "legible, and simply note in matrix_runout what you could or could not read. Never ask the user for a photo that would not " +
+      "move the number. " +
+      (body.prior && (body.prior.value_low_usd != null || body.prior.identification)
+        ? "PRIOR APPRAISAL OF THIS SAME RECORD (baseline): " +
+          JSON.stringify({
+            value_low_usd: body.prior.value_low_usd ?? null,
+            value_high_usd: body.prior.value_high_usd ?? null,
+            identification: body.prior.identification ?? null,
+            matrix_runout: body.prior.matrix_runout ?? null,
+          }) +
+          ". Keep the value range unless the photos give a concrete new reason to change it (a matrix reading that identifies a " +
+          "different or more specific pressing, or condition you can now see). If you change it, say exactly why in " +
+          "reasoning.pressing. Do not re-estimate from scratch; a re-appraisal with no new evidence must return the same range. "
+        : "") +
       "Respond with ONLY a JSON object, no prose, no markdown fences, in exactly this shape:\n" +
       "{\n" +
       '  "artist": string,\n' +
@@ -151,6 +178,7 @@ export async function POST(req: NextRequest) {
       '    "identification": string (a specific, dealer-style identification of exactly which pressing this is, e.g. "Early German pressing on Apple Records, catalog 1C 072-04 243, with GEMA rights stamp — not the 1969 UK first pressing"),\n' +
       '    "is_first_pressing": boolean | null (true if this appears to be a first/original pressing, false if a later pressing/reissue, null if genuinely unclear),\n' +
       '    "matrix_runout": string | null (any matrix/runout/deadwax text you can read, or null),\n' +
+      '    "matrix_legible": boolean (true ONLY if you actually transcribed specific etched or stamped characters from the runout; false if the runout was absent, cropped out, blurred, glared, or blank),\n' +
       '    "country_of_pressing": string | null,\n' +
       '    "distinguishing_marks": string | null (rights-society stamps, label variations, plant marks that pin down the pressing),\n' +
       '    "uncertainty": string | null (if you could NOT narrow to one pressing, name what is ambiguous and what would resolve it — e.g. "a clear close-up of the etched matrix numbers next to the label on Side A would confirm first vs second pressing"; only ever ask for the Side A runout, never Side B; null if confident)\n' +
@@ -172,6 +200,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
+        temperature: 0,
         max_tokens: 1900,
         messages: [{ role: "user", content }],
       }),
@@ -226,7 +255,8 @@ export async function POST(req: NextRequest) {
     matrix_runout: typeof parsed.pressing_details.matrix_runout === "string" ? parsed.pressing_details.matrix_runout.trim() : null,
     country_of_pressing: typeof parsed.pressing_details.country_of_pressing === "string" ? parsed.pressing_details.country_of_pressing.trim() : null,
     distinguishing_marks: typeof parsed.pressing_details.distinguishing_marks === "string" ? parsed.pressing_details.distinguishing_marks.trim() : null,
-    uncertainty: typeof parsed.pressing_details.uncertainty === "string" ? parsed.pressing_details.uncertainty.trim() : null,
+    uncertainty: typeof parsed.pressing_details.uncertainty === "string" && parsed.pressing_details.uncertainty.trim() ? parsed.pressing_details.uncertainty.trim() : null,
+    matrix_legible: parsed.pressing_details.matrix_legible === true,
   } : null;
 
   // --- Enrich with real market pricing (degrades to AI estimate if creds absent) ---

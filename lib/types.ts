@@ -42,6 +42,7 @@ export interface Record {
     country_of_pressing?: string | null;
     distinguishing_marks?: string | null;
     uncertainty?: string | null;
+    matrix_legible?: boolean | null;
   } | null;
   created_at: string;
   updated_at: string;

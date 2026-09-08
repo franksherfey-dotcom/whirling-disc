@@ -94,25 +94,22 @@ export function DeadwaxCapture({ onCapture, onCancel }: Props) {
           </div>
         </>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
-          {/* A record: label in gold, the ring we care about highlighted */}
-          <svg width="180" height="180" viewBox="0 0 180 180" aria-hidden="true" className="mb-8">
-            <circle cx="90" cy="90" r="86" fill="#141414" stroke="#333" strokeWidth="2" />
-            <circle cx="90" cy="90" r="70" fill="none" stroke="#2a2a2a" strokeWidth="1" />
-            <circle cx="90" cy="90" r="60" fill="none" stroke="#2a2a2a" strokeWidth="1" />
-            <circle cx="90" cy="90" r="46" fill="none" stroke="#c9a227" strokeWidth="10" opacity="0.35" />
-            <circle cx="90" cy="90" r="38" fill="#c9a227" />
-            <circle cx="90" cy="90" r="4" fill="#000" />
-            <text x="90" y="150" textAnchor="middle" fontSize="10" fill="#c9a227" fontFamily="system-ui" letterSpacing="1">THE ETCHING IS IN THIS RING</text>
-          </svg>
+        <div className="flex-1 overflow-y-auto flex flex-col items-center px-6 pt-2 pb-8 text-center" style={{ WebkitOverflowScrolling: "touch" }}>
+          <img
+            src="/etched-numbers-guide.jpg"
+            alt="A record label with the smooth ring around it highlighted: the etched numbers are in that ring"
+            className="w-full max-w-sm rounded-2xl mb-5"
+            style={{ border: "1px solid #333" }}
+          />
           <h2 className="font-display text-2xl mb-3" style={{ color: "#fff" }}>Use your phone's camera</h2>
           <p className="text-sm leading-relaxed mb-2" style={{ color: "#bbb" }}>
-            Get close so the <span style={{ color: "#c9a227" }}>label fills the screen</span>. The tiny scratched-in
-            numbers sit in the smooth ring right around it, so they'll be in the shot on their own.
+            Frame it like the picture: <span style={{ color: "#c9a227" }}>label in the middle, black vinyl showing all the
+            way around it</span>. The scratched-in numbers sit in that smooth ring, so they'll be in the shot on their own.
           </p>
           <p className="text-xs leading-relaxed mb-8" style={{ color: "#888" }}>
             Tap the ring on screen so the camera focuses there. Light from the side (a lamp, or tilt the record toward
-            a window) makes the etching pop; straight overhead light makes it vanish.
+            a window) makes the etching pop; straight overhead light makes it vanish. Don't go so close that the ring
+            gets cut off.
           </p>
           {error && <p className="text-xs mb-4" style={{ color: "#f0a89f" }}>{error}</p>}
           <button onClick={openCamera} disabled={busy} className="w-full max-w-xs py-4 rounded-2xl font-eyebrow text-sm flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: "#c9a227", color: "#0d0d0d" }}>

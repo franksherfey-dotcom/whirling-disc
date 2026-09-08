@@ -21,6 +21,7 @@ export default function RecordDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [reappraising, setReappraising] = useState(false);
   const [deadwaxCamera, setDeadwaxCamera] = useState(false);
+  const [tightenNote, setTightenNote] = useState<string | null>(null);
 
   const captureDeadwaxAndTighten = async (dataUrl: string) => {
     setDeadwaxCamera(false);
@@ -38,6 +39,16 @@ export default function RecordDetailPage() {
       if (!res.ok) throw new Error(json?.error || "Re-appraise failed");
       const { data } = await supabase.from("records").select("*").eq("id", id).single();
       setRec(data);
+      const matrix = data?.pressing_details?.matrix_runout;
+      if (json.matrix_legible && json.value_changed) {
+        setTightenNote(`Read the etched numbers (${matrix}). Pressing confirmed and the value updated.`);
+      } else if (json.matrix_legible) {
+        setTightenNote(`Read the etched numbers (${matrix}). They confirm what we already had, so the value is unchanged.`);
+      } else if (!data?.pressing_details?.uncertainty) {
+        setTightenNote("Couldn't make out the etched numbers, but this pressing is already identified from the label, so nothing changes. No need to retake.");
+      } else {
+        setTightenNote(null); // the retake box below explains what to do
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -121,6 +132,11 @@ export default function RecordDetailPage() {
           onCapture={captureDeadwaxAndTighten}
           onCancel={() => setDeadwaxCamera(false)}
         />
+      )}
+      {tightenNote && (
+        <div className="px-4 py-3 rounded-xl mb-4 text-sm" style={{ background: "rgba(201,162,39,0.12)", border: "1px solid var(--wd-gold)", color: "var(--wd-text)" }}>
+          {tightenNote}
+        </div>
       )}
       <div className="flex items-center justify-between mb-6">
         <Link href="/records" className="font-eyebrow text-xs" style={{ color: "var(--wd-text-dim)" }}>← Back to crate</Link>
@@ -215,17 +231,18 @@ export default function RecordDetailPage() {
           )}
           {rec.pressing_details.uncertainty && !rec.deadwax_url && (
             <p className="mt-2 text-[11px]" style={{ color: "var(--wd-text-faint)" }}>
-              Uses your phone's camera. Get close so the Side A label fills the screen; the etched numbers live in the smooth ring right around it. Light from the side makes them readable.
+              Uses your phone's camera. Side A, label in the middle with black vinyl showing all around it; the etched numbers live in that smooth ring. Light from the side makes them readable.
             </p>
           )}
           {/* Deadwax photo exists but it's STILL uncertain → the photo wasn't legible, prompt a retake */}
           {rec.pressing_details.uncertainty && rec.deadwax_url && (
             <div className="mt-3">
+              <img src="/etched-numbers-guide.jpg" alt="Where the etched numbers are: the smooth ring around the label" className="w-full rounded-xl mb-3" style={{ border: "1px solid var(--wd-border)" }} />
               <div className="flex items-center gap-3 mb-3">
                 <img src={rec.deadwax_url} alt="deadwax" className="rounded-lg object-cover flex-shrink-0" style={{ width: 56, height: 56, border: "1px solid rgba(176,40,28,0.4)" }} />
                 <p className="text-xs leading-relaxed" style={{ color: "#f0a89f" }}>
-                  We couldn't read the etched numbers in that photo. Get closer so the label fills the screen, tap the
-                  ring to focus, and light it from the side so the etching casts a shadow. Glare and blur are the usual culprits.
+                  We couldn't read the etched numbers in that photo. Frame it like the picture above (label in the middle,
+                  vinyl showing all around), tap the ring to focus, and light it from the side so the etching casts a shadow.
                 </p>
               </div>
               <button onClick={() => setDeadwaxCamera(true)} disabled={reappraising} className="w-full py-3 rounded-xl font-eyebrow text-xs flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>

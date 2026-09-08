@@ -65,10 +65,24 @@ export async function POST(req: NextRequest) {
       side_a: discUrls[0] || undefined,
       side_b: discUrls[1] || undefined,
       deadwax: deadwaxUrl || undefined,
+      prior: {
+        value_low_usd: rec.value_low_cents != null ? rec.value_low_cents / 100 : null,
+        value_high_usd: rec.value_high_cents != null ? rec.value_high_cents / 100 : null,
+        identification: rec.pressing_details?.identification ?? null,
+        matrix_runout: rec.pressing_details?.matrix_runout ?? null,
+        summary: rec.summary ?? null,
+      },
     }),
   });
   const ai = await analyzeRes.json();
   if (!analyzeRes.ok) return NextResponse.json({ error: ai?.error || "Analysis failed" }, { status: 500 });
+
+  // Stability guard. A re-appraisal only earns the right to move the stored
+  // value when it brings new evidence: a legible matrix reading. Otherwise
+  // the notes refresh but the number the user already saw stays put.
+  const hadValue = rec.value_low_cents != null && rec.value_high_cents != null;
+  const newEvidence = ai.pressing_details?.matrix_legible === true;
+  const keepValue = hadValue && !newEvidence;
 
   const mediaAvg = avgGrade(ai.media_condition_a, ai.media_condition_b);
 
@@ -84,10 +98,10 @@ export async function POST(req: NextRequest) {
     genres: Array.isArray(ai.genres) && ai.genres.length ? ai.genres : rec.genres,
     media_condition: dbGrade(mediaAvg) ?? rec.media_condition,
     sleeve_condition: dbGrade(ai.sleeve_condition) ?? rec.sleeve_condition,
-    value_low_cents: Math.round((ai.value_low_usd ?? 0) * 100),
-    value_high_cents: Math.round((ai.value_high_usd ?? 0) * 100),
-    value_source: ai.value_source ?? rec.value_source,
-    value_breakdown: ai.value_breakdown ?? rec.value_breakdown,
+    value_low_cents: keepValue ? rec.value_low_cents : Math.round((ai.value_low_usd ?? 0) * 100),
+    value_high_cents: keepValue ? rec.value_high_cents : Math.round((ai.value_high_usd ?? 0) * 100),
+    value_source: keepValue ? rec.value_source : (ai.value_source ?? rec.value_source),
+    value_breakdown: keepValue ? rec.value_breakdown : (ai.value_breakdown ?? rec.value_breakdown),
     ai_confidence: ai.confidence ?? rec.ai_confidence,
     summary: ai.summary ?? rec.summary,
     condition_notes: ai.condition_notes ?? rec.condition_notes,
@@ -97,5 +111,5 @@ export async function POST(req: NextRequest) {
   }).eq("id", body.id);
 
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
-  return NextResponse.json({ ok: true, id: body.id });
+  return NextResponse.json({ ok: true, id: body.id, value_changed: !keepValue, matrix_legible: newEvidence });
 }
