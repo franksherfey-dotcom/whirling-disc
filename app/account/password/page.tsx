@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Record } from "../../components/Record";
+import { PasskeySettings } from "../../components/PasskeySettings";
 
 function ChangePasswordInner() {
   const [pw, setPw] = useState("");
@@ -86,6 +87,8 @@ function ChangePasswordInner() {
       <button onClick={submit} disabled={busy} className="w-full py-3.5 rounded-2xl font-eyebrow text-sm flex items-center justify-center disabled:opacity-60" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>
         {busy ? <Record size={20} spinning /> : "Save password"}
       </button>
+
+      {!forced && <PasskeySettings />}
     </div>
   );
 }

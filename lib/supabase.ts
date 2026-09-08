@@ -16,5 +16,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
     storageKey: "whirling-disc-auth",
     flowType: "pkce",
+    // Passkeys (Face ID / Touch ID / fingerprint). Supabase marks this API
+    // experimental and requires the opt-in; without it every auth.passkey.*
+    // call throws.
+    experimental: { passkey: true },
   },
 });

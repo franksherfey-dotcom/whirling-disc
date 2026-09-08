@@ -5,6 +5,7 @@ import { Record } from "./components/Record";
 import { VersionWatcher } from "./components/VersionWatcher";
 import { AuthGuard } from "./components/AuthGuard";
 import { AdminNavLink } from "./components/AdminNavLink";
+import { PasskeyNudge } from "./components/PasskeyNudge";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -52,6 +53,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <a href="/share" className="font-eyebrow text-xs px-4 py-2 rounded-full whitespace-nowrap flex-shrink-0" style={{ color: "var(--wd-text-dim)", border: "1px solid var(--wd-border)" }}>
                   Share
                 </a>
+                <a href="/account/password" title="Password and Face ID" className="font-eyebrow text-xs px-4 py-2 rounded-full whitespace-nowrap flex-shrink-0" style={{ color: "var(--wd-text-dim)", border: "1px solid var(--wd-border)" }}>
+                  Account
+                </a>
                 <a href="/price-check" title="A quick estimate while shopping. Nothing is saved." className="font-eyebrow text-xs px-4 py-2 rounded-full whitespace-nowrap flex-shrink-0" style={{ color: "var(--wd-red-bright, #e0503f)", border: "1px solid var(--wd-red, #b02418)", background: "rgba(176,40,28,0.12)" }}>
                   🔍 Quick Price
                 </a>
@@ -65,7 +69,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
         </nav>
-        <main className="max-w-6xl mx-auto px-5 sm:px-8 py-8">{children}</main>
+        <main className="max-w-6xl mx-auto px-5 sm:px-8 py-8">
+          <PasskeyNudge />
+          {children}
+        </main>
       </body>
     </html>
   );
