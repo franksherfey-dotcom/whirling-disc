@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 // Public pages that don't require a session.
-const PUBLIC = ["/", "/signin", "/signup", "/forgot-password"];
+const PUBLIC = ["/", "/signin", "/signup", "/forgot-password", "/privacy", "/terms"];
 const isPublic = (path: string) =>
   PUBLIC.includes(path) || path.startsWith("/join/");
 

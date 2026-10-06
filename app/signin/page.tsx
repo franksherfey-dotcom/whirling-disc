@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Record } from "../components/Record";
+import { AppleSignIn } from "../components/AppleSignIn";
 import { biometricLabel, isQuietPasskeyError, platformAuthenticatorAvailable } from "@/lib/passkeys";
 
 export default function SignIn() {
@@ -98,6 +99,8 @@ export default function SignIn() {
             {error}
           </div>
         )}
+
+        <AppleSignIn onSignedIn={afterSignIn} />
 
         {bioAvailable && (
           <>

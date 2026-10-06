@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Record } from "../components/Record";
 import Link from "next/link";
+import { AppleSignIn } from "../components/AppleSignIn";
+import { isIOSApp } from "@/lib/native";
 
 export default function SignUp() {
   const [email, setEmail] = useState("");
@@ -14,6 +17,10 @@ export default function SignUp() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [iosApp, setIosApp] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => { setIosApp(isIOSApp()); }, []);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +79,9 @@ export default function SignUp() {
         </div>
         <h1 className="font-display text-5xl mb-3" style={{ color: "var(--wd-text)" }}>Create account</h1>
         <p className="text-sm mb-8 leading-relaxed" style={{ color: "var(--wd-text-dim)" }}>
-          Free to start — catalog up to three records, then upgrade for the full collection.
+          {iosApp
+            ? "Free to start. Catalog up to three records."
+            : "Free to start — catalog up to three records, then upgrade for the full collection."}
         </p>
 
         {error && (
@@ -80,6 +89,8 @@ export default function SignUp() {
             {error}
           </div>
         )}
+
+        <AppleSignIn label="Sign up with Apple" onSignedIn={() => router.push("/records")} />
 
         <form onSubmit={handleSignUp} className="space-y-3">
           <div className="flex gap-3">
@@ -93,6 +104,12 @@ export default function SignUp() {
             {isLoading ? <Record size={20} spinning /> : "Create account"}
           </button>
         </form>
+
+        <p className="text-center text-xs mt-4 leading-relaxed" style={{ color: "var(--wd-text-faint)" }}>
+          By creating an account you agree to the{" "}
+          <Link href="/terms" style={{ color: "var(--wd-text-dim)", textDecoration: "underline" }}>Terms</Link> and{" "}
+          <Link href="/privacy" style={{ color: "var(--wd-text-dim)", textDecoration: "underline" }}>Privacy Policy</Link>.
+        </p>
 
         <p className="text-center text-sm mt-6" style={{ color: "var(--wd-text-faint)" }}>
           Already have a crate?{" "}

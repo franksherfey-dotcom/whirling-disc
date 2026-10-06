@@ -73,6 +73,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PasskeyNudge />
           {children}
         </main>
+        <footer className="max-w-6xl mx-auto px-5 sm:px-8 pt-4 pb-10 flex items-center justify-center gap-5 text-xs" style={{ color: "var(--wd-text-faint)" }}>
+          <a href="/privacy" style={{ color: "var(--wd-text-faint)" }}>Privacy</a>
+          <span aria-hidden="true">·</span>
+          <a href="/terms" style={{ color: "var(--wd-text-faint)" }}>Terms</a>
+        </footer>
       </body>
     </html>
   );

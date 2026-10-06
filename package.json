@@ -9,19 +9,23 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@capacitor-community/apple-sign-in": "^7.1.0",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
+    "@supabase/supabase-js": "^2.116.0",
+    "next": "^14.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "next": "^14.2.0",
-    "@supabase/supabase-js": "^2.116.0",
     "sharp": "^0.33.5"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
+    "@capacitor/cli": "^8.5.2",
     "@types/node": "^20.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
-    "tailwindcss": "^3.4.1",
+    "autoprefixer": "^10.4.17",
     "postcss": "^8.4.35",
-    "autoprefixer": "^10.4.17"
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.4.0"
   }
 }

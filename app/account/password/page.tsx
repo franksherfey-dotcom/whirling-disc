@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Record } from "../../components/Record";
 import { PasskeySettings } from "../../components/PasskeySettings";
+import { DeleteAccount } from "../../components/DeleteAccount";
 
 function ChangePasswordInner() {
   const [pw, setPw] = useState("");
@@ -89,6 +90,7 @@ function ChangePasswordInner() {
       </button>
 
       {!forced && <PasskeySettings />}
+      {!forced && <DeleteAccount />}
     </div>
   );
 }

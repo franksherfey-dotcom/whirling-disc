@@ -7,6 +7,7 @@ import { toDbGrade, averageGrades } from "@/lib/conditions";
 import { Record } from "../../components/Record";
 import { CameraCapture } from "../../components/CameraCapture";
 import { DeadwaxCapture } from "../../components/DeadwaxCapture";
+import { isIOSApp } from "@/lib/native";
 
 async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((res, rej) => {
@@ -249,13 +250,22 @@ export default function AddRecordPage() {
         <div className="flex justify-center mb-6"><Record size={56} /></div>
         <p className="font-eyebrow text-xs mb-2" style={{ color: "var(--wd-gold)" }}>Free crate full</p>
         <h1 className="font-display text-3xl mb-3" style={{ color: "var(--wd-text)" }}>You've cataloged your 3 free records</h1>
-        <p className="text-sm mb-8" style={{ color: "var(--wd-text-dim)" }}>
-          The free crate holds 3 records — enough to see how it works. Upgrade for unlimited cataloging,
-          full value history, and the insurance &amp; estate schedule.
-        </p>
-        <a href="mailto:frank.sherfey@gmail.com?subject=Whirling%20Disc%20-%20Upgrade%20to%20unlimited" className="inline-block px-8 py-3.5 rounded-2xl font-eyebrow text-sm" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>
-          Go unlimited
-        </a>
+        {isIOSApp() ? (
+          // No purchase or upgrade UI in the iOS build until in-app purchase ships.
+          <p className="text-sm mb-8" style={{ color: "var(--wd-text-dim)" }}>
+            The free crate holds 3 records, enough to see how it works.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm mb-8" style={{ color: "var(--wd-text-dim)" }}>
+              The free crate holds 3 records — enough to see how it works. Upgrade for unlimited cataloging,
+              full value history, and the insurance &amp; estate schedule.
+            </p>
+            <a href="mailto:frank.sherfey@gmail.com?subject=Whirling%20Disc%20-%20Upgrade%20to%20unlimited" className="inline-block px-8 py-3.5 rounded-2xl font-eyebrow text-sm" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>
+              Go unlimited
+            </a>
+          </>
+        )}
         <div className="mt-4">
           <a href="/records" className="font-eyebrow text-xs" style={{ color: "var(--wd-text-dim)" }}>← Back to crate</a>
         </div>
