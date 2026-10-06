@@ -100,6 +100,21 @@ export default function AdminPage() {
     finally { setBusyId(null); }
   };
 
+  const sendMagicLink = async (id: string, email: string) => {
+    setBusyId(id); setError(null); setAddMsg(null);
+    try {
+      const res = await fetch("/api/admin/magic-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}` },
+        body: JSON.stringify({ id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Couldn't send magic link");
+      setAddMsg(`Magic link sent to ${email}. They tap it to log in, then set a password.`);
+    } catch (e) { setError((e as Error).message); }
+    finally { setBusyId(null); }
+  };
+
   const addUser = async () => {
     setAddBusy(true); setAddMsg(null); setError(null);
     try {
@@ -212,7 +227,8 @@ export default function AdminPage() {
                     {u.suspended
                       ? <Btn onClick={() => act(u.id, "unsuspend")} busy={busyId === u.id} gold>Unsuspend</Btn>
                       : <Btn onClick={() => act(u.id, "suspend")} busy={busyId === u.id} danger>Suspend</Btn>}
-                    <Btn onClick={() => act(u.id, "force_password")} busy={busyId === u.id}>Reset pw</Btn>
+                    <Btn onClick={() => sendMagicLink(u.id, u.email)} busy={busyId === u.id} gold>Send magic link</Btn>
+                    <Btn onClick={() => act(u.id, "force_password")} busy={busyId === u.id}>Force PW change</Btn>
                     {/* Admin grant is deliberately the last, quietest control */}
                     {u.is_admin
                       ? <Btn onClick={() => { if (confirm(`Remove admin access from ${u.email}?`)) act(u.id, "remove_admin"); }} busy={busyId === u.id} faint>Remove admin</Btn>
