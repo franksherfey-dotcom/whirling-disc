@@ -66,7 +66,7 @@ export function DeadwaxCapture({ onCapture, onCancel }: Props) {
   const openCamera = () => inputRef.current?.click();
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "#000" }}>
+    <div className="fixed inset-0 z-50 flex flex-col wd-safe-top wd-safe-bottom-pad" style={{ background: "#000" }}>
       <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={onFile} className="hidden" />
 
       <div className="flex items-center justify-between px-5 py-4" style={{ color: "#fff" }}>

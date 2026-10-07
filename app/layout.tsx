@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Playfair_Display, Inter } from "next/font/google";
 import "./globals.css";
 import { Record } from "./components/Record";
@@ -26,8 +26,14 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport = {
+export const viewport: Viewport = {
   themeColor: "#0d0d0d",
+  width: "device-width",
+  initialScale: 1,
+  // Required for env(safe-area-inset-*) to be non-zero. The Capacitor shell
+  // runs the web view edge to edge (contentInset "never"), so without this
+  // the nav sits under the iPhone status bar / Dynamic Island.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -36,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <VersionWatcher />
         <AuthGuard />
-        <nav className="border-b" style={{ borderColor: "var(--wd-border)", background: "rgba(13,13,13,0.85)" }}>
+        <nav className="border-b wd-safe-top" style={{ borderColor: "var(--wd-border)", background: "rgba(13,13,13,0.85)" }}>
           <div className="max-w-6xl mx-auto px-5 sm:px-8">
             <div className="flex justify-between items-center h-16">
               <a href="/records" className="flex items-center gap-3 flex-shrink-0 mr-3">
@@ -73,7 +79,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PasskeyNudge />
           {children}
         </main>
-        <footer className="max-w-6xl mx-auto px-5 sm:px-8 pt-4 pb-10 flex items-center justify-center gap-5 text-xs" style={{ color: "var(--wd-text-faint)" }}>
+        <footer className="max-w-6xl mx-auto px-5 sm:px-8 pt-4 pb-10 wd-safe-bottom flex items-center justify-center gap-5 text-xs" style={{ color: "var(--wd-text-faint)" }}>
           <a href="/privacy" style={{ color: "var(--wd-text-faint)" }}>Privacy</a>
           <span aria-hidden="true">·</span>
           <a href="/terms" style={{ color: "var(--wd-text-faint)" }}>Terms</a>

@@ -233,7 +233,7 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
 
   if (preview) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "#000" }}>
+      <div className="fixed inset-0 z-50 flex flex-col wd-safe-top wd-safe-bottom-pad" style={{ background: "#000" }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ color: "#fff" }}>
           <button onClick={() => { setPreview(null); onCancel(); }} className="font-eyebrow text-xs" style={{ color: "#bbb" }}>Cancel</button>
           <span className="font-eyebrow text-xs">Can you read it?</span>
@@ -259,7 +259,7 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "#000" }}>
+    <div className="fixed inset-0 z-50 flex flex-col wd-safe-top wd-safe-bottom-pad" style={{ background: "#000" }}>
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4" style={{ color: "#fff" }}>
         <button onClick={() => { stop(); onCancel(); }} className="font-eyebrow text-xs" style={{ color: "#bbb" }}>Cancel</button>

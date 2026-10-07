@@ -86,6 +86,14 @@ body {
   box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.15);
 }
 
+/* iPhone safe areas. Only non-zero with viewport-fit=cover (set in app/layout.tsx).
+   In the Capacitor shell the web view is edge to edge, so the nav must push
+   itself below the status bar / Dynamic Island, and the footer above the
+   home indicator. No effect in desktop browsers. */
+.wd-safe-top { padding-top: env(safe-area-inset-top, 0px); }
+.wd-safe-bottom { padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px)); }
+.wd-safe-bottom-pad { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
 /* Hide horizontal scrollbar on the nav while keeping it swipeable */
 .whirl-nav-scroll::-webkit-scrollbar { display: none; }
 .whirl-nav-scroll { -ms-overflow-style: none; }
