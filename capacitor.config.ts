@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "com.franksherfey.whirlingdisc",
-  appName: "Whirling Disc",
+  appName: "Whirlin' Disc",
   // Offline fallback page. TestFlight builds load the live site via server.url;
   // before App Store submission this becomes the bundled static export.
   webDir: "ios-shell",
