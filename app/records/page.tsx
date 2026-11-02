@@ -6,6 +6,15 @@ import type { Record as VinylRecord } from "@/lib/types";
 import { toUiGrade, GRADE_LABELS, GRADE_DEFINITIONS, type UiGrade } from "@/lib/conditions";
 import { SOURCE_LABEL } from "@/lib/pricing/blend";
 import { RecordLoader, Record } from "../components/Record";
+import {
+  loadMyCollections,
+  labelFor,
+  getActiveCollectionId,
+  setActiveCollectionId,
+  resolveActive,
+  canEdit,
+  type MyCollection,
+} from "@/lib/activeCollection";
 import Link from "next/link";
 
 const usd = (c?: number | null) => (c == null ? null : `$${Math.round(c / 100).toLocaleString()}`);
@@ -32,18 +41,61 @@ export default function RecordsPage() {
   const [firstPressOnly, setFirstPressOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
 
+  // Collection switcher: the crate(s) this user can see, and which one is active.
+  const [collections, setCollections] = useState<MyCollection[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const active = useMemo(() => collections.find((c) => c.id === activeId) || null, [collections, activeId]);
+
+  // Load the user's collections once, then settle on an active one.
   useEffect(() => {
     (async () => {
-      try {
-        const { data } = await supabase.from("records").select("*").order("created_at", { ascending: false });
-        setRecords(data || []);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setIsLoading(false);
+      const cols = await loadMyCollections();
+      setCollections(cols);
+      const chosen = resolveActive(cols, getActiveCollectionId());
+      if (chosen) {
+        setActiveId(chosen.id);
+        setActiveCollectionId(chosen.id);
+      } else {
+        setIsLoading(false); // no collections yet (brand-new account)
       }
     })();
   }, []);
+
+  // Load records for whichever crate is active; reload when it changes.
+  useEffect(() => {
+    if (!activeId) return;
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      try {
+        const { data } = await supabase
+          .from("records")
+          .select("*")
+          .eq("collection_id", activeId)
+          .order("created_at", { ascending: false });
+        if (!cancelled) setRecords(data || []);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeId]);
+
+  const switchTo = (id: string) => {
+    if (id === activeId) return;
+    setActiveCollectionId(id);
+    setActiveId(id);
+    // reset filters so a search from one crate doesn't hide the other
+    setQuery("");
+    setGenre("all");
+    setDecade("all");
+    setGrade("all");
+    setFirstPressOnly(false);
+  };
 
   // Build filter options from the actual catalog so nothing is empty.
   const genreOptions = useMemo(() => {
@@ -103,8 +155,43 @@ export default function RecordsPage() {
     );
   }
 
+  const activeIsShared = !!active && !active.is_owner;
+  const activeCanAdd = canEdit(active);
+
   return (
     <div className="space-y-6">
+      {/* Collection switcher — only appears when the user can see more than one crate */}
+      {collections.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {collections.map((c) => {
+            const on = c.id === activeId;
+            return (
+              <button
+                key={c.id}
+                onClick={() => switchTo(c.id)}
+                className="px-4 py-2 rounded-full font-eyebrow text-xs flex items-center gap-2 transition-colors"
+                style={on
+                  ? { background: "var(--wd-gold)", color: "#0d0d0d", border: "1px solid var(--wd-gold)" }
+                  : { background: "var(--wd-surface)", color: "var(--wd-text-dim)", border: "1px solid var(--wd-border)" }}
+              >
+                {labelFor(c)}
+                <span style={{ color: on ? "#0d0d0d" : "var(--wd-gold)", opacity: on ? 0.7 : 1 }}>{c.record_count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* When viewing a crate that isn't yours, make it unmistakable */}
+      {activeIsShared && (
+        <div className="rounded-2xl px-4 py-3 text-xs flex items-center gap-2" style={{ background: "rgba(201,162,39,0.10)", color: "var(--wd-gold-bright)", border: "1px solid rgba(201,162,39,0.30)" }}>
+          <span>
+            You&rsquo;re in <strong>{active?.owner_label}&rsquo;s</strong> crate
+            {activeCanAdd ? " — records you add here save to their collection." : " — view only."}
+          </span>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <span className="px-4 py-2 rounded-full font-eyebrow text-xs flex items-center gap-2" style={{ background: "rgba(201,162,39,0.12)", color: "var(--wd-gold-bright)", border: "1px solid rgba(201,162,39,0.35)" }}>
           All <span style={{ color: "var(--wd-gold)" }}>{records.length}</span>
@@ -178,16 +265,24 @@ export default function RecordsPage() {
         <p className="font-eyebrow text-xs" style={{ color: "var(--wd-text-faint)" }}>
           Latest digs {filtered.length !== records.length ? `· ${filtered.length} shown` : ""}
         </p>
-        <Link href="/records/add" className="font-eyebrow text-xs" style={{ color: "var(--wd-gold)" }}>+ Add Record</Link>
+        {activeCanAdd && (
+          <Link href="/records/add" className="font-eyebrow text-xs" style={{ color: "var(--wd-gold)" }}>
+            + Add to {activeIsShared ? `${active?.owner_label}'s` : "my"} crate
+          </Link>
+        )}
       </div>
 
       {filtered.length === 0 ? (
         <div className="rounded-3xl p-14 text-center flex flex-col items-center" style={{ background: "var(--wd-surface)", border: "1px solid var(--wd-border)" }}>
           <Record size={64} />
           <p className="mt-6 mb-6" style={{ color: "var(--wd-text-dim)" }}>
-            {records.length === 0 ? "Your crate is empty. Tap + Add to crate to photograph and save your first record. (Quick Price estimates aren't saved.)" : "No records match those filters."}
+            {records.length === 0
+              ? activeIsShared
+                ? `${active?.owner_label}'s crate is empty.${activeCanAdd ? " Tap + Add to photograph and save the first record." : ""}`
+                : "Your crate is empty. Tap + Add to crate to photograph and save your first record. (Quick Price estimates aren't saved.)"
+              : "No records match those filters."}
           </p>
-          {records.length === 0 && (
+          {records.length === 0 && activeCanAdd && (
             <Link href="/records/add" className="px-6 py-3 rounded-full font-eyebrow text-xs" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>Add Your First Record</Link>
           )}
         </div>

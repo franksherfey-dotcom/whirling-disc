@@ -8,6 +8,7 @@ import { Record } from "../../components/Record";
 import { CameraCapture } from "../../components/CameraCapture";
 import { DeadwaxCapture } from "../../components/DeadwaxCapture";
 import { isIOSApp } from "@/lib/native";
+import { loadMyCollections, getActiveCollectionId, canEdit, type MyCollection } from "@/lib/activeCollection";
 
 async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((res, rej) => {
@@ -64,6 +65,18 @@ async function getOrCreateCollectionId(userId: string): Promise<string> {
   return created.id;
 }
 
+// Save into whichever crate the user last selected on the crate page, as long
+// as they can still edit it; otherwise fall back to their own collection.
+async function resolveTargetCollectionId(userId: string): Promise<string> {
+  const storedId = getActiveCollectionId();
+  if (storedId) {
+    const cols = await loadMyCollections();
+    const match = cols.find((c) => c.id === storedId) || null;
+    if (match && canEdit(match)) return match.id;
+  }
+  return getOrCreateCollectionId(userId);
+}
+
 export default function AddRecordPage() {
   const [discCount, setDiscCount] = useState(1);
   const [front, setFront] = useState<string | null>(null);
@@ -76,6 +89,7 @@ export default function AddRecordPage() {
   const [status, setStatus] = useState<"idle" | "analyzing" | "saving">("idle");
   const [error, setError] = useState<string | null>(null);
   const [limitReached, setLimitReached] = useState(false);
+  const [targetCrate, setTargetCrate] = useState<MyCollection | null>(null);
 
   const router = useRouter();
 
@@ -92,6 +106,17 @@ export default function AddRecordPage() {
       const { count } = await supabase
         .from("records").select("id", { count: "exact", head: true }).eq("user_id", user.id);
       if ((count ?? 0) >= FREE_LIMIT) setLimitReached(true);
+    })();
+  }, []);
+
+  // Figure out which crate this record will save to, for the header note.
+  useEffect(() => {
+    (async () => {
+      const storedId = getActiveCollectionId();
+      if (!storedId) return;
+      const cols = await loadMyCollections();
+      const match = cols.find((c) => c.id === storedId) || null;
+      if (match && canEdit(match)) setTargetCrate(match);
     })();
   }, []);
 
@@ -151,7 +176,7 @@ export default function AddRecordPage() {
       if (!res.ok) throw new Error(ai?.error || "Could not value this record.");
 
       setStatus("saving");
-      const collectionId = await getOrCreateCollectionId(user.id);
+      const collectionId = await resolveTargetCollectionId(user.id);
 
       // Upload covers + every disc photo.
       const [coverUrl, backUrl, deadwaxUrl] = await Promise.all([
@@ -287,7 +312,11 @@ export default function AddRecordPage() {
           onCancel={() => setCameraTarget(null)}
         />
       )}
-      <p className="font-eyebrow text-xs mb-2" style={{ color: "var(--wd-gold)" }}>Add to crate · Saves to your collection</p>
+      <p className="font-eyebrow text-xs mb-2" style={{ color: "var(--wd-gold)" }}>
+        {targetCrate && !targetCrate.is_owner
+          ? `Add to crate · Saves to ${targetCrate.owner_label}'s collection`
+          : "Add to crate · Saves to your collection"}
+      </p>
       <h1 className="font-display text-4xl mb-2" style={{ color: "var(--wd-text)" }}>Photograph it</h1>
       <p className="text-sm mb-6" style={{ color: "var(--wd-text-dim)" }}>
         Set how many discs are in the release, then photograph both sides of each one, plus the covers.
