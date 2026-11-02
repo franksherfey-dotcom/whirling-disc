@@ -90,6 +90,8 @@ export default function AddRecordPage() {
   const [error, setError] = useState<string | null>(null);
   const [limitReached, setLimitReached] = useState(false);
   const [targetCrate, setTargetCrate] = useState<MyCollection | null>(null);
+  const [box, setBox] = useState("");
+  const [boxOptions, setBoxOptions] = useState<string[]>([]);
 
   const router = useRouter();
 
@@ -116,7 +118,14 @@ export default function AddRecordPage() {
       if (!storedId) return;
       const cols = await loadMyCollections();
       const match = cols.find((c) => c.id === storedId) || null;
-      if (match && canEdit(match)) setTargetCrate(match);
+      if (match && canEdit(match)) {
+        setTargetCrate(match);
+        // Offer the boxes already in use in this crate for quick reuse.
+        const { data } = await supabase
+          .from("records").select("location").eq("collection_id", match.id).not("location", "is", null);
+        const boxes = Array.from(new Set((data || []).map((r) => (r.location || "").trim()).filter(Boolean))).sort();
+        setBoxOptions(boxes);
+      }
     })();
   }, []);
 
@@ -212,6 +221,7 @@ export default function AddRecordPage() {
         side_a_label: ai.side_a_label ?? null,
         side_b_label: ai.side_b_label ?? null,
         disc_count: discCount,
+        location: box.trim() || null,
         sleeve_condition: toDbGrade(ai.sleeve_condition),
         value_low_cents: Math.round((ai.value_low_usd ?? 0) * 100),
         value_high_cents: Math.round((ai.value_high_usd ?? 0) * 100),
@@ -336,6 +346,23 @@ export default function AddRecordPage() {
           <span className="w-6 text-center text-lg font-semibold" style={{ color: "var(--wd-text)" }}>{discCount}</span>
           <button type="button" onClick={() => changeDiscCount(discCount + 1)} className="w-9 h-9 rounded-full font-bold" style={{ background: "var(--wd-surface-2)", border: "1px solid var(--wd-border)", color: "var(--wd-text)" }} aria-label="More discs">+</button>
         </div>
+      </div>
+
+      {/* Which physical box this record goes in — labeled as you catalog */}
+      <div className="rounded-2xl px-5 py-4 mb-6" style={{ background: "var(--wd-surface)", border: "1px solid var(--wd-border)" }}>
+        <p className="text-sm font-semibold mb-1" style={{ color: "var(--wd-text)" }}>📦 Box / storage location</p>
+        <p className="text-[11px] mb-3" style={{ color: "var(--wd-text-faint)" }}>Where this record is stored, e.g. &ldquo;Box 1&rdquo; or &ldquo;Shelf B.&rdquo; Optional.</p>
+        <input
+          value={box}
+          onChange={(e) => setBox(e.target.value)}
+          list="wd-box-options"
+          placeholder="Box 1"
+          className="wd-input w-full px-4 py-3 rounded-xl text-sm"
+          style={{ background: "var(--wd-surface-2)", border: "1px solid var(--wd-border)", color: "var(--wd-text)" }}
+        />
+        <datalist id="wd-box-options">
+          {boxOptions.map((b) => <option key={b} value={b} />)}
+        </datalist>
       </div>
 
       {/* Covers */}

@@ -56,6 +56,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <a href="/stats" className="font-eyebrow text-xs px-4 py-2 rounded-full whitespace-nowrap flex-shrink-0" style={{ color: "var(--wd-text-dim)", border: "1px solid var(--wd-border)" }}>
                   Stats
                 </a>
+                <a href="/account/boxes" title="Label which box each record is stored in" className="font-eyebrow text-xs px-4 py-2 rounded-full whitespace-nowrap flex-shrink-0" style={{ color: "var(--wd-text-dim)", border: "1px solid var(--wd-border)" }}>
+                  📦 Boxes
+                </a>
                 <a href="/share" className="font-eyebrow text-xs px-4 py-2 rounded-full whitespace-nowrap flex-shrink-0" style={{ color: "var(--wd-text-dim)", border: "1px solid var(--wd-border)" }}>
                   Share
                 </a>

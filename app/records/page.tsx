@@ -38,6 +38,7 @@ export default function RecordsPage() {
   const [genre, setGenre] = useState("all");
   const [decade, setDecade] = useState("all");
   const [grade, setGrade] = useState("all");
+  const [box, setBox] = useState("all");
   const [firstPressOnly, setFirstPressOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
 
@@ -94,6 +95,7 @@ export default function RecordsPage() {
     setGenre("all");
     setDecade("all");
     setGrade("all");
+    setBox("all");
     setFirstPressOnly(false);
   };
 
@@ -113,6 +115,16 @@ export default function RecordsPage() {
     return Array.from(s).sort();
   }, [records]);
 
+  const boxOptions = useMemo(() => {
+    const s = new Set<string>();
+    records.forEach((r) => {
+      const b = (r.location || "").trim();
+      if (b) s.add(b);
+    });
+    return Array.from(s).sort();
+  }, [records]);
+  const unboxedCount = useMemo(() => records.filter((r) => !(r.location || "").trim()).length, [records]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let out = records.filter((r) => {
@@ -120,6 +132,10 @@ export default function RecordsPage() {
       if (genre !== "all" && !(r.genres || []).includes(genre)) return false;
       if (decade !== "all" && decadeOf(r.year) !== decade) return false;
       if (grade !== "all" && (r.media_condition ? toUiGrade(r.media_condition) : null) !== grade) return false;
+      if (box !== "all") {
+        const b = (r.location || "").trim();
+        if (box === "__none__" ? b !== "" : b !== box) return false;
+      }
       if (firstPressOnly && r.pressing_details?.is_first_pressing !== true) return false;
       return true;
     });
@@ -139,7 +155,7 @@ export default function RecordsPage() {
       }
     });
     return out;
-  }, [records, query, genre, decade, grade, firstPressOnly, sort]);
+  }, [records, query, genre, decade, grade, box, firstPressOnly, sort]);
 
   const totals = useMemo(() => {
     const low = records.reduce((s, r) => s + (r.value_low_cents ?? 0), 0);
@@ -245,6 +261,13 @@ export default function RecordsPage() {
           <option value="all">Any media grade</option>
           {GRADE_RANK.map((g) => <option key={g} value={g}>{GRADE_LABELS[g]}</option>)}
         </Select>
+        {(boxOptions.length > 0 || unboxedCount > 0) && (
+          <Select value={box} onChange={setBox} label="box">
+            <option value="all">📦 All boxes</option>
+            {boxOptions.map((b) => <option key={b} value={b}>{b}</option>)}
+            {unboxedCount > 0 && <option value="__none__">Unboxed ({unboxedCount})</option>}
+          </Select>
+        )}
         <Select value={sort} onChange={(v) => setSort(v as SortKey)} label="sort">
           {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
         </Select>
@@ -265,11 +288,16 @@ export default function RecordsPage() {
         <p className="font-eyebrow text-xs" style={{ color: "var(--wd-text-faint)" }}>
           Latest digs {filtered.length !== records.length ? `· ${filtered.length} shown` : ""}
         </p>
-        {activeCanAdd && (
-          <Link href="/records/add" className="font-eyebrow text-xs" style={{ color: "var(--wd-gold)" }}>
-            + Add to {activeIsShared ? `${active?.owner_label}'s` : "my"} crate
-          </Link>
-        )}
+        <div className="flex items-center gap-4">
+          {(boxOptions.length > 0 || activeCanAdd) && (
+            <Link href="/account/boxes" className="font-eyebrow text-xs" style={{ color: "var(--wd-text-dim)" }}>📦 Boxes</Link>
+          )}
+          {activeCanAdd && (
+            <Link href="/records/add" className="font-eyebrow text-xs" style={{ color: "var(--wd-gold)" }}>
+              + Add to {activeIsShared ? `${active?.owner_label}'s` : "my"} crate
+            </Link>
+          )}
+        </div>
       </div>
 
       {filtered.length === 0 ? (
