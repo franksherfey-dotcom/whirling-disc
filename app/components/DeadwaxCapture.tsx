@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { Record } from "./Record";
+import { captureRunoutNative } from "../../lib/torch";
 
 const SKIP_KEY = "wd_deadwax_skip_intro";
 
@@ -44,6 +46,42 @@ async function fileToCroppedDataUrl(file: File): Promise<string> {
   }
 }
 
+// Scores how sharp a photo is (variance of the Laplacian on a small grey copy).
+// Blurry shots score low, so the sharpest of the three native shots wins.
+async function sharpnessScore(blob: Blob): Promise<number> {
+  const N = 512;
+  const bmp = await createImageBitmap(blob, { resizeWidth: N, resizeHeight: N });
+  const c = document.createElement("canvas");
+  c.width = N;
+  c.height = N;
+  const ctx = c.getContext("2d")!;
+  ctx.drawImage(bmp, 0, 0);
+  bmp.close?.();
+  const d = ctx.getImageData(0, 0, N, N).data;
+  const g = new Float32Array(N * N);
+  for (let i = 0; i < N * N; i++) g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+  let sum = 0, sum2 = 0, n = 0;
+  for (let y = 1; y < N - 1; y++) {
+    for (let x = 1; x < N - 1; x++) {
+      const i = y * N + x;
+      const l = 4 * g[i] - g[i - 1] - g[i + 1] - g[i - N] - g[i + N];
+      sum += l;
+      sum2 += l * l;
+      n++;
+    }
+  }
+  const mean = sum / n;
+  return sum2 / n - mean * mean;
+}
+
+// Keeps the sharpest of the native shots and returns it as a File.
+async function sharpestFile(shots: string[]): Promise<File> {
+  const blobs = shots.map((b64) => new Blob([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], { type: "image/jpeg" }));
+  const scores = await Promise.all(blobs.map(sharpnessScore));
+  const best = scores.indexOf(Math.max(...scores));
+  return new File([blobs[best]], "runout.jpg", { type: "image/jpeg" });
+}
+
 export function DeadwaxCapture({ onCapture, onCancel }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -77,7 +115,7 @@ export function DeadwaxCapture({ onCapture, onCancel }: Props) {
     }
   };
 
-  const openCamera = () => {
+  const openCamera = async () => {
     if (dontShow) {
       try {
         localStorage.setItem(SKIP_KEY, "1");
@@ -85,6 +123,30 @@ export function DeadwaxCapture({ onCapture, onCancel }: Props) {
         /* ignore */
       }
       setSkipIntro(true);
+    }
+    // iOS shell: the full-screen capture takes three shots at three light levels.
+    if (Capacitor.isNativePlatform()) {
+      setBusy(true);
+      setError(null);
+      const shots = await captureRunoutNative();
+      if (shots === null) {
+        // Older shell build without the native screen: fall back to the system camera.
+        setBusy(false);
+        inputRef.current?.click();
+        return;
+      }
+      if (shots.length === 0) {
+        setBusy(false); // cancelled
+        return;
+      }
+      try {
+        setPreview(await fileToCroppedDataUrl(await sharpestFile(shots)));
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setBusy(false);
+      }
+      return;
     }
     inputRef.current?.click();
   };

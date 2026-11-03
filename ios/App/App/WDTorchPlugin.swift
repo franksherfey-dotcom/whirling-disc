@@ -9,8 +9,25 @@ public class WDTorchPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "WDTorchPlugin"
     public let jsName = "WDTorch"
     public let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "setTorch", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "setTorch", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "captureRunout", returnType: CAPPluginReturnPromise)
     ]
+
+    // Opens the full-screen runout capture and resolves with three stills
+    // (base64 JPEG) taken at three torch levels. Rejects if cancelled.
+    @objc func captureRunout(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let vc = RunoutCaptureViewController()
+            vc.modalPresentationStyle = .fullScreen
+            vc.onFinish = { shots in
+                call.resolve(["shots": shots.map { $0.base64EncodedString() }])
+            }
+            vc.onCancel = {
+                call.reject("cancelled")
+            }
+            self.bridge?.viewController?.present(vc, animated: true)
+        }
+    }
 
     @objc func setTorch(_ call: CAPPluginCall) {
         let on = call.getBool("on") ?? false

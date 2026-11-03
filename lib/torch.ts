@@ -4,6 +4,7 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 // Safari does not expose the torch to web pages, so the shell does it.
 type WDTorchPlugin = {
   setTorch(options: { on: boolean; level: number }): Promise<{ supported: boolean }>;
+  captureRunout(): Promise<{ shots: string[] }>;
 };
 const WDTorch = registerPlugin<WDTorchPlugin>("WDTorch");
 
@@ -27,5 +28,18 @@ export async function setTorch(on: boolean, level: number, track?: MediaStreamTr
     return true;
   } catch {
     return false;
+  }
+}
+
+// Full-screen runout capture in the iOS shell: three stills at three light
+// levels (base64 JPEG). Returns null when the native screen isn't available
+// (browsers, or an older shell build), and [] when the user cancels.
+export async function captureRunoutNative(): Promise<string[] | null> {
+  if (!Capacitor.isNativePlatform()) return null;
+  try {
+    const r = await WDTorch.captureRunout();
+    return r.shots;
+  } catch (e) {
+    return String((e as Error)?.message || e).includes("cancelled") ? [] : null;
   }
 }
