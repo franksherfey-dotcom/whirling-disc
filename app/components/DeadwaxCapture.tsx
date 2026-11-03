@@ -1,7 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Record } from "./Record";
+
+const SKIP_KEY = "wd_deadwax_skip_intro";
 
 type Props = {
   onCapture: (dataUrl: string) => void;
@@ -47,6 +49,18 @@ export function DeadwaxCapture({ onCapture, onCancel }: Props) {
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // After the first couple of captures the tips are just friction, so let the
+  // user dismiss them for good; returning users get a compact one-tap screen.
+  const [skipIntro, setSkipIntro] = useState(false);
+  const [dontShow, setDontShow] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(SKIP_KEY) === "1") setSkipIntro(true);
+    } catch {
+      /* storage blocked — just show the tips */
+    }
+  }, []);
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -63,7 +77,17 @@ export function DeadwaxCapture({ onCapture, onCancel }: Props) {
     }
   };
 
-  const openCamera = () => inputRef.current?.click();
+  const openCamera = () => {
+    if (dontShow) {
+      try {
+        localStorage.setItem(SKIP_KEY, "1");
+      } catch {
+        /* ignore */
+      }
+      setSkipIntro(true);
+    }
+    inputRef.current?.click();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col wd-safe-top wd-safe-bottom-pad" style={{ background: "#000" }}>
@@ -93,6 +117,16 @@ export function DeadwaxCapture({ onCapture, onCancel }: Props) {
             </button>
           </div>
         </>
+      ) : skipIntro ? (
+        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-10 text-center">
+          {error && <p className="text-xs mb-4" style={{ color: "#f0a89f" }}>{error}</p>}
+          <button onClick={openCamera} disabled={busy} className="w-full max-w-xs py-4 rounded-2xl font-eyebrow text-sm flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: "#c9a227", color: "#0d0d0d" }}>
+            {busy ? <Record size={20} spinning /> : "📷 Open camera"}
+          </button>
+          <button onClick={() => setSkipIntro(false)} className="mt-5 font-eyebrow text-xs" style={{ color: "#777" }}>
+            Show tips
+          </button>
+        </div>
       ) : (
         <div className="flex-1 overflow-y-auto flex flex-col items-center px-6 pt-2 pb-8 text-center" style={{ WebkitOverflowScrolling: "touch" }}>
           <img
@@ -106,11 +140,15 @@ export function DeadwaxCapture({ onCapture, onCancel }: Props) {
             Frame it like the picture: <span style={{ color: "#c9a227" }}>label in the middle, black vinyl showing all the
             way around it</span>. The scratched-in numbers sit in that smooth ring, so they'll be in the shot on their own.
           </p>
-          <p className="text-xs leading-relaxed mb-8" style={{ color: "#888" }}>
+          <p className="text-xs leading-relaxed mb-6" style={{ color: "#888" }}>
             Tap the ring on screen so the camera focuses there. Light from the side (a lamp, or tilt the record toward
             a window) makes the etching pop; straight overhead light makes it vanish. Don't go so close that the ring
             gets cut off.
           </p>
+          <label className="flex items-center gap-2 mb-6 text-xs cursor-pointer" style={{ color: "#999" }}>
+            <input type="checkbox" checked={dontShow} onChange={(e) => setDontShow(e.target.checked)} style={{ accentColor: "#c9a227", width: 16, height: 16 }} />
+            Don&rsquo;t show these tips again
+          </label>
           {error && <p className="text-xs mb-4" style={{ color: "#f0a89f" }}>{error}</p>}
           <button onClick={openCamera} disabled={busy} className="w-full max-w-xs py-4 rounded-2xl font-eyebrow text-sm flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: "#c9a227", color: "#0d0d0d" }}>
             {busy ? <Record size={20} spinning /> : "📷 Open camera"}
