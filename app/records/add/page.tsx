@@ -153,8 +153,10 @@ export default function AddRecordPage() {
 
   // Quick check: after the front cover, ask whether the runout photo is worth taking.
   const [quickCheck, setQuickCheck] = useState<null | { recommended: boolean; reason: string }>(null);
+  const [quickBusy, setQuickBusy] = useState(false);
   const runQuickCheck = async (frontUrl: string) => {
     setQuickCheck(null);
+    setQuickBusy(true);
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -168,6 +170,8 @@ export default function AddRecordPage() {
       }
     } catch {
       /* the quick check is optional; the full analysis still runs on save */
+    } finally {
+      setQuickBusy(false);
     }
   };
 
@@ -438,6 +442,16 @@ export default function AddRecordPage() {
         <PhotoTile url={front} title="Front cover" hint="The album art" onClick={() => setCameraTarget({ kind: "front", title: "Front cover", guide: "square" })} />
         <PhotoTile url={back} title="Back cover" hint="Tracklist & credits" onClick={() => setCameraTarget({ kind: "back", title: "Back cover", guide: "square" })} />
       </div>
+      {/* Right under the front cover, so the answer comes before the other photos */}
+      {quickBusy && !quickCheck && (
+        <p className="text-[11px] mb-3" style={{ color: "var(--wd-text-faint)" }}>Checking whether this one needs a runout shot…</p>
+      )}
+      {quickCheck && (
+        <div className="mb-4 px-3 py-2.5 rounded-xl text-xs leading-relaxed" style={{ background: "var(--wd-surface)", border: "1px solid var(--wd-border)", color: quickCheck.recommended ? "var(--wd-gold)" : "var(--wd-text-dim)" }}>
+          {quickCheck.recommended ? "📷 Worth a runout shot: " : "Runout optional: "}
+          {quickCheck.reason}
+        </div>
+      )}
 
       {/* Disc photos — 2 per disc, generated from disc count */}
       <p className="font-eyebrow text-[11px] mb-3" style={{ color: "var(--wd-text-faint)" }}>
@@ -456,12 +470,6 @@ export default function AddRecordPage() {
       </div>
 
       {/* Etched numbers — optional, but it is what lets the value commit to one pressing */}
-      {quickCheck && (
-        <div className="mb-3 px-3 py-2.5 rounded-xl text-xs leading-relaxed" style={{ background: "var(--wd-surface)", border: "1px solid var(--wd-border)", color: quickCheck.recommended ? "var(--wd-gold)" : "var(--wd-text-dim)" }}>
-          {quickCheck.recommended ? "📷 Worth a runout shot: " : "Runout optional: "}
-          {quickCheck.reason}
-        </div>
-      )}
       <p className="font-eyebrow text-[11px] mb-3" style={{ color: "var(--wd-text-faint)" }}>Etched numbers (optional)</p>
       <div className="grid grid-cols-2 gap-4 mb-2">
         <PhotoTile
