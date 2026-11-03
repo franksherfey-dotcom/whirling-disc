@@ -53,9 +53,14 @@ export async function deadwaxTiles(src: string): Promise<DeadwaxTile[]> {
     const buf = await sharp(squareBuf)
       .extract({ left, top, width: tileSide, height: tileSide })
       .resize(Math.min(TILE_MAX_PX, tileSide), Math.min(TILE_MAX_PX, tileSide), { fit: "inside" })
-      .normalise() // stretch contrast so shallow etching in dark vinyl separates from the surface
-      .sharpen()
-      .jpeg({ quality: 88 })
+      // Faint etching is low-contrast grey on grey. Grayscale removes the
+      // colour cast from the label, then local contrast (CLAHE) lifts the
+      // grooves in each patch of the ring without blowing out the label.
+      .grayscale()
+      .normalise()
+      .clahe({ width: 64, height: 64, maxSlope: 3 })
+      .sharpen({ sigma: 1.2, m1: 1, m2: 3 })
+      .jpeg({ quality: 90 })
       .toBuffer();
     tiles.push({
       role: `label close-up, MAGNIFIED ${name} quadrant of the same shot. The label edge and the smooth runout ring are in this tile; read any scratched or stamped characters in the ring (they may be upside-down or run along the curve)`,
