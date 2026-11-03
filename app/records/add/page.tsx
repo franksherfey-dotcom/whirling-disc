@@ -41,6 +41,12 @@ async function normalizeImage(file: File, maxEdge = 1600, quality = 0.85): Promi
   }
 }
 
+// A problem with specific photos, with the photos to retake named in the message.
+class PhotoProblem extends Error {}
+
+// A photo held as a JPEG data URL. Anything else will fail to encode or upload.
+const isJpegDataUrl = (s?: string | null) => !!s && /^data:image\/[a-z]+;base64,[A-Za-z0-9+/=\s]+$/.test(s);
+
 async function uploadPhoto(userId: string, slot: string, dataUrl: string): Promise<string | undefined> {
   try {
     const blob = await (await fetch(dataUrl)).blob();
@@ -214,6 +220,7 @@ export default function AddRecordPage() {
   // is a low-level failure, almost always a photo that didn't encode cleanly;
   // we keep it in the console for debugging and show guidance instead.
   const friendlyError = (e: unknown): string => {
+    if (e instanceof PhotoProblem) return e.message;
     const raw = (e as Error)?.message || String(e);
     const low = raw.toLowerCase();
     if (raw === "SIGNED_OUT" || low.includes("jwt") || low.includes("not signed in") || low.includes("auth"))
@@ -238,6 +245,18 @@ export default function AddRecordPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("SIGNED_OUT");
 
+      // Name any photo that can't be read before sending anything, so the
+      // retake is one photo, not all of them.
+      const unreadable = [
+        front && !isJpegDataUrl(front) ? "Front cover" : null,
+        back && !isJpegDataUrl(back) ? "Back cover" : null,
+        deadwax && !isJpegDataUrl(deadwax) ? "Label close-up, Side A" : null,
+        ...Object.entries(discPhotos).map(([i, p]) => (p && !isJpegDataUrl(p) ? discLabel(Number(i)) : null)),
+      ].filter(Boolean) as string[];
+      if (unreadable.length) {
+        throw new PhotoProblem(`Retake ${unreadable.join(", ")}. ${unreadable.length > 1 ? "Those photos" : "That photo"} didn't save correctly, usually a dark or blurry shot.`);
+      }
+
       // The AI grades the first disc's two sides (representative of the set).
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -250,18 +269,28 @@ export default function AddRecordPage() {
       setStatus("saving");
       const collectionId = await resolveTargetCollectionId(user.id);
 
-      // Upload covers + every disc photo.
+      // Upload covers + every disc photo, remembering which ones failed.
+      const failed: string[] = [];
+      const track = async (label: string, slot: string, data?: string | null) => {
+        if (!data) return undefined;
+        const url = await uploadPhoto(user.id, slot, data);
+        if (!url) failed.push(label);
+        return url;
+      };
       const [coverUrl, backUrl, deadwaxUrl] = await Promise.all([
-        front ? uploadPhoto(user.id, "front", front) : Promise.resolve(undefined),
-        back ? uploadPhoto(user.id, "back", back) : Promise.resolve(undefined),
-        deadwax ? uploadPhoto(user.id, "deadwax", deadwax) : Promise.resolve(undefined),
+        track("Front cover", "front", front),
+        track("Back cover", "back", back),
+        track("Label close-up, Side A", "deadwax", deadwax),
       ]);
       const discUrls: string[] = [];
       for (let i = 0; i < totalDiscSlots; i++) {
         if (discPhotos[i]) {
-          const u = await uploadPhoto(user.id, `disc-${i}`, discPhotos[i]);
+          const u = await track(discLabel(i), `disc-${i}`, discPhotos[i]);
           if (u) discUrls.push(u);
         }
+      }
+      if (failed.length) {
+        throw new PhotoProblem(`Retake ${failed.join(", ")}. ${failed.length > 1 ? "Those photos" : "That photo"} didn't upload. Check your connection, retake, then tap Value it & add again.`);
       }
 
       const mediaAvg = averageGrades(ai.media_condition_a, ai.media_condition_b);
