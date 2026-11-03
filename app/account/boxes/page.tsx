@@ -27,8 +27,16 @@ export default function BoxesPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameVal, setRenameVal] = useState("");
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const editable = canEdit(active);
+  const toggle = (name: string) =>
+    setExpanded((prev) => {
+      const n = new Set(prev);
+      n.has(name) ? n.delete(name) : n.add(name);
+      return n;
+    });
 
   useEffect(() => {
     (async () => {
@@ -65,6 +73,8 @@ export default function BoxesPage() {
     setActiveId(id);
     setMsg(null);
     setRenaming(null);
+    setQuery("");
+    setExpanded(new Set());
   };
 
   // Group records by box; the "unboxed" bucket sorts last.
@@ -81,6 +91,26 @@ export default function BoxesPage() {
   }, [records]);
 
   const boxNames = useMemo(() => groups.map(([n]) => n).filter((n) => n !== NONE), [groups]);
+
+  // Apply the search filter per box. While searching, only boxes with a match
+  // are shown and they open automatically; otherwise each box honors its own
+  // collapsed/expanded state.
+  const q = query.trim().toLowerCase();
+  const visibleGroups = useMemo(() => {
+    return groups
+      .map(([name, recs]) => {
+        const shown = q
+          ? recs.filter(
+              (r) =>
+                (r.title || "").toLowerCase().includes(q) ||
+                (r.artist || "").toLowerCase().includes(q)
+            )
+          : recs;
+        return { name, total: recs.length, shown };
+      })
+      .filter((g) => !q || g.shown.length > 0);
+  }, [groups, q]);
+  const searching = q.length > 0;
 
   const renameBox = async (oldName: string) => {
     const nn = renameVal.trim();
@@ -163,6 +193,28 @@ export default function BoxesPage() {
         </div>
       )}
 
+      {/* Search across every box in this crate */}
+      {groups.length > 0 && (
+        <div className="flex items-center gap-2">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search this crate by title or artist"
+            className="wd-input flex-1 px-4 py-3 rounded-2xl text-sm"
+            style={{ background: "var(--wd-surface)", border: "1px solid var(--wd-border)", color: "var(--wd-text)" }}
+          />
+          {!searching && groups.length > 1 && (
+            <button
+              onClick={() => setExpanded(expanded.size >= groups.length ? new Set() : new Set(groups.map(([n]) => n)))}
+              className="font-eyebrow text-xs px-3 py-3 rounded-2xl whitespace-nowrap"
+              style={{ color: "var(--wd-text-dim)", border: "1px solid var(--wd-border)" }}
+            >
+              {expanded.size >= groups.length ? "Collapse all" : "Expand all"}
+            </button>
+          )}
+        </div>
+      )}
+
       {msg && (
         <div className="rounded-xl px-4 py-2 text-xs" style={{ background: "rgba(201,162,39,0.10)", color: "var(--wd-gold-bright)", border: "1px solid rgba(201,162,39,0.30)" }}>{msg}</div>
       )}
@@ -180,13 +232,19 @@ export default function BoxesPage() {
         </div>
       )}
 
+      {searching && visibleGroups.length === 0 && (
+        <p className="text-sm px-1" style={{ color: "var(--wd-text-dim)" }}>No records match “{query}.”</p>
+      )}
+
       <div className="space-y-4">
-        {groups.map(([name, recs]) => {
+        {visibleGroups.map(({ name, total, shown }) => {
           const isNone = name === NONE;
+          const isOpen = searching || expanded.has(name);
+          const isRenaming = renaming === name && !isNone;
           return (
             <div key={name} className="rounded-2xl overflow-hidden" style={{ background: "var(--wd-surface)", border: "1px solid var(--wd-border)" }}>
-              <div className="flex items-center justify-between gap-3 px-5 py-3" style={{ borderBottom: "1px solid var(--wd-border)" }}>
-                {renaming === name && !isNone ? (
+              <div className="flex items-center justify-between gap-3 px-5 py-3" style={isOpen ? { borderBottom: "1px solid var(--wd-border)" } : undefined}>
+                {isRenaming ? (
                   <div className="flex items-center gap-2 flex-1">
                     <input
                       autoFocus
@@ -201,43 +259,54 @@ export default function BoxesPage() {
                   </div>
                 ) : (
                   <>
-                    <p className="text-sm font-semibold flex items-center gap-2" style={{ color: isNone ? "var(--wd-text-dim)" : "var(--wd-text)" }}>
-                      {isNone ? "Unboxed" : `📦 ${name}`}
-                      <span className="font-eyebrow text-[11px]" style={{ color: "var(--wd-text-faint)" }}>{recs.length}</span>
-                    </p>
+                    <button
+                      onClick={() => !searching && toggle(name)}
+                      className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                      aria-expanded={isOpen}
+                    >
+                      <span className="text-[10px]" style={{ color: "var(--wd-text-faint)", transition: "transform .15s", transform: isOpen ? "rotate(90deg)" : "none" }}>▶</span>
+                      <span className="text-sm font-semibold truncate" style={{ color: isNone ? "var(--wd-text-dim)" : "var(--wd-text)" }}>
+                        {isNone ? "Unboxed" : `📦 ${name}`}
+                      </span>
+                      <span className="font-eyebrow text-[11px] flex-shrink-0" style={{ color: "var(--wd-text-faint)" }}>
+                        {searching ? `${shown.length} of ${total}` : total}
+                      </span>
+                    </button>
                     {!isNone && editable && (
-                      <button onClick={() => { setRenaming(name); setRenameVal(name); }} className="font-eyebrow text-xs" style={{ color: "var(--wd-gold)" }}>Rename</button>
+                      <button onClick={() => { setRenaming(name); setRenameVal(name); }} className="font-eyebrow text-xs flex-shrink-0" style={{ color: "var(--wd-gold)" }}>Rename</button>
                     )}
                   </>
                 )}
               </div>
-              <div>
-                {recs.map((r) => (
-                  <div key={r.id} className="flex items-center gap-3 px-5 py-2.5" style={{ borderTop: "1px solid var(--wd-border)" }}>
-                    <div className="w-9 h-9 rounded overflow-hidden flex-shrink-0" style={{ background: "var(--wd-surface-2)" }}>
-                      {r.cover_url ? <img src={r.cover_url} alt="" className="w-full h-full object-cover" /> : null}
+              {isOpen && (
+                <div>
+                  {shown.map((r) => (
+                    <div key={r.id} className="flex items-center gap-3 px-5 py-2.5" style={{ borderTop: "1px solid var(--wd-border)" }}>
+                      <div className="w-9 h-9 rounded overflow-hidden flex-shrink-0" style={{ background: "var(--wd-surface-2)" }}>
+                        {r.cover_url ? <img src={r.cover_url} alt="" className="w-full h-full object-cover" /> : null}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate" style={{ color: "var(--wd-text)" }}>{r.title}</p>
+                        <p className="text-xs truncate" style={{ color: "var(--wd-text-dim)" }}>{r.artist}</p>
+                      </div>
+                      {editable && (
+                        <select
+                          aria-label="Move to box"
+                          value={isNone ? NONE : name}
+                          onChange={(e) => moveRecord(r, e.target.value)}
+                          disabled={busy}
+                          className="wd-input px-3 py-1.5 rounded-full text-xs font-eyebrow cursor-pointer flex-shrink-0"
+                          style={{ background: "var(--wd-surface-2)", border: "1px solid var(--wd-border)", color: "var(--wd-text-dim)" }}
+                        >
+                          {boxNames.map((b) => <option key={b} value={b}>{b}</option>)}
+                          <option value={NONE}>Unboxed</option>
+                          <option value="__new__">＋ New box…</option>
+                        </select>
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm truncate" style={{ color: "var(--wd-text)" }}>{r.title}</p>
-                      <p className="text-xs truncate" style={{ color: "var(--wd-text-dim)" }}>{r.artist}</p>
-                    </div>
-                    {editable && (
-                      <select
-                        aria-label="Move to box"
-                        value={isNone ? NONE : name}
-                        onChange={(e) => moveRecord(r, e.target.value)}
-                        disabled={busy}
-                        className="wd-input px-3 py-1.5 rounded-full text-xs font-eyebrow cursor-pointer flex-shrink-0"
-                        style={{ background: "var(--wd-surface-2)", border: "1px solid var(--wd-border)", color: "var(--wd-text-dim)" }}
-                      >
-                        {boxNames.map((b) => <option key={b} value={b}>{b}</option>)}
-                        <option value={NONE}>Unboxed</option>
-                        <option value="__new__">＋ New box…</option>
-                      </select>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
