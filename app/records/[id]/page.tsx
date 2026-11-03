@@ -273,7 +273,12 @@ export default function RecordDetailPage() {
           )}
           {/* Resolved: deadwax on file AND no remaining uncertainty */}
           {rec.deadwax_url && !rec.pressing_details.uncertainty && (
-            <p className="text-[11px] mt-3" style={{ color: "var(--wd-gold)" }}>✓ Confirmed from the etched numbers. This value reflects the matrix reading.</p>
+            <div className="mt-3">
+              <p className="text-[11px] mb-3" style={{ color: "var(--wd-gold)" }}>✓ Confirmed from the etched numbers. This value reflects the matrix reading.</p>
+              <button onClick={() => setDeadwaxCamera(true)} disabled={reappraising} className="w-full py-3 rounded-xl font-eyebrow text-xs flex items-center justify-center gap-2 disabled:opacity-60" style={{ border: "1px solid var(--wd-border)", color: "var(--wd-text)" }}>
+                {reappraising ? "Reading the etched numbers…" : "📷 Replace the etched-numbers photo"}
+              </button>
+            </div>
           )}
         </div>
       )}

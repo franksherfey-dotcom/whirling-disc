@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { setTorch } from "../../lib/torch";
 
 type Props = {
   title: string;               // e.g. "Front cover" or "Disc — Side A"
@@ -42,6 +43,11 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
   const startedAtRef = useRef(0);  // when the stream became ready; auto-snap waits for AF to settle
   const [preview, setPreview] = useState<string | null>(null); // confirm step
   const [attempt, setAttempt] = useState(0); // bumping this restarts the camera for a retake
+  const [light, setLight] = useState(true);   // camera light: on for every shot, user can turn it off
+  const [level, setLevel] = useState(1);      // light brightness, 0.05 to 1 (iOS shell only)
+  const [lightOk, setLightOk] = useState(false); // false hides the light controls on devices without a torch
+  const levelRef = useRef(1);
+  levelRef.current = level;
 
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -56,6 +62,7 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext("2d")!.drawImage(video, 0, 0);
+    setTorch(false, 0, streamRef.current?.getVideoTracks()[0] ?? null);
     // Etched characters are tiny; keep more pixels so the model can read them.
     const jpeg = canvasToJpeg(canvas, subject === "deadwax" ? 2048 : 1600, subject === "deadwax" ? 0.9 : 0.85);
     stop();
@@ -115,6 +122,20 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
     })();
     return () => { cancelled = true; stop(); };
   }, [stop, subject, attempt]);
+
+  // Light: on while the camera is live, off when it stops or the screen closes.
+  useEffect(() => {
+    if (!ready || !light) return;
+    const track = streamRef.current?.getVideoTracks()[0] ?? null;
+    setTorch(true, levelRef.current, track).then((ok) => setLightOk(ok));
+    return () => { setTorch(false, 0, track); };
+  }, [ready, light]);
+
+  // Brightness changes apply while the light is on.
+  useEffect(() => {
+    if (!ready || !light) return;
+    setTorch(true, level, streamRef.current?.getVideoTracks()[0] ?? null);
+  }, [level]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-snap loop: sample the center region; when it's bright, detailed, and
   // stable for a few frames, capture. This is a heuristic, not true object
@@ -264,10 +285,24 @@ export function CameraCapture({ title, guide = "square", subject = "cover", onCa
       <div className="flex items-center justify-between px-5 py-4" style={{ color: "#fff" }}>
         <button onClick={() => { stop(); onCancel(); }} className="font-eyebrow text-xs" style={{ color: "#bbb" }}>Cancel</button>
         <span className="font-eyebrow text-xs">{title}</span>
-        <button onClick={() => setAutoOn((v) => !v)} className="font-eyebrow text-xs px-3 py-1.5 rounded-full" style={{ border: "1px solid #444", color: autoOn ? "#c9a227" : "#bbb" }}>
-          Auto {autoOn ? "on" : "off"}
-        </button>
+        <div className="flex items-center gap-2">
+          {lightOk && (
+            <button onClick={() => setLight((v) => !v)} className="font-eyebrow text-xs px-3 py-1.5 rounded-full" style={{ border: "1px solid #444", color: light ? "#c9a227" : "#bbb" }}>
+              Light {light ? "on" : "off"}
+            </button>
+          )}
+          <button onClick={() => setAutoOn((v) => !v)} className="font-eyebrow text-xs px-3 py-1.5 rounded-full" style={{ border: "1px solid #444", color: autoOn ? "#c9a227" : "#bbb" }}>
+            Auto {autoOn ? "on" : "off"}
+          </button>
+        </div>
       </div>
+      {lightOk && light && (
+        <div className="flex items-center gap-3 px-5 pb-3" style={{ color: "#bbb" }}>
+          <span className="font-eyebrow text-[10px]">Dim</span>
+          <input type="range" min={0.05} max={1} step={0.05} value={level} onChange={(e) => setLevel(Number(e.target.value))} className="flex-1" aria-label="Light brightness" />
+          <span className="font-eyebrow text-[10px]">Bright</span>
+        </div>
+      )}
 
       {/* Viewfinder */}
       <div className="relative flex-1 overflow-hidden">

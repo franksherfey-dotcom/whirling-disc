@@ -134,9 +134,29 @@ export default function AddRecordPage() {
   // Which slot the live camera is capturing for: 'front', 'back', or a disc index.
   const [cameraTarget, setCameraTarget] = useState<null | { kind: "front" | "back" | "disc" | "deadwax"; idx?: number; title: string; guide: "circle" | "square" | "band" }>(null);
 
+  // Quick check: after the front cover, ask whether the runout photo is worth taking.
+  const [quickCheck, setQuickCheck] = useState<null | { recommended: boolean; reason: string }>(null);
+  const runQuickCheck = async (frontUrl: string) => {
+    setQuickCheck(null);
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quick: true, front: frontUrl }),
+      });
+      const data = await res.json();
+      const pd = data?.pressing_details;
+      if (res.ok && pd && typeof pd.deadwax_recommended === "boolean") {
+        setQuickCheck({ recommended: pd.deadwax_recommended, reason: pd.deadwax_reason ?? "" });
+      }
+    } catch {
+      /* the quick check is optional; the full analysis still runs on save */
+    }
+  };
+
   const handleCapture = (dataUrl: string) => {
     if (!cameraTarget) return;
-    if (cameraTarget.kind === "front") setFront(dataUrl);
+    if (cameraTarget.kind === "front") { setFront(dataUrl); runQuickCheck(dataUrl); }
     else if (cameraTarget.kind === "back") setBack(dataUrl);
     else if (cameraTarget.kind === "deadwax") setDeadwax(dataUrl);
     else if (cameraTarget.kind === "disc" && cameraTarget.idx != null) {
@@ -412,6 +432,12 @@ export default function AddRecordPage() {
       </div>
 
       {/* Etched numbers — optional, but it is what lets the value commit to one pressing */}
+      {quickCheck && (
+        <div className="mb-3 px-3 py-2.5 rounded-xl text-xs leading-relaxed" style={{ background: "var(--wd-surface)", border: "1px solid var(--wd-border)", color: quickCheck.recommended ? "var(--wd-gold)" : "var(--wd-text-dim)" }}>
+          {quickCheck.recommended ? "📷 Worth a runout shot: " : "Runout optional: "}
+          {quickCheck.reason}
+        </div>
+      )}
       <p className="font-eyebrow text-[11px] mb-3" style={{ color: "var(--wd-text-faint)" }}>Etched numbers (optional)</p>
       <div className="grid grid-cols-2 gap-4 mb-2">
         <PhotoTile

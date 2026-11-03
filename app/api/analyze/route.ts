@@ -9,6 +9,8 @@ export const runtime = "nodejs";
 export const maxDuration = 90;
 
 type Body = {
+  // Quick check: front cover only, returns the runout recommendation before the rest of the photos are taken.
+  quick?: boolean;
   front?: string;
   back?: string;
   side_a?: string;
@@ -57,13 +59,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
+  const quick = body.quick === true;
   const images = [
     { role: "front cover", src: imageSource(body.front) },
     { role: "back cover", src: imageSource(body.back) },
     { role: "disc side A", src: imageSource(body.side_a) },
     { role: "disc side B", src: imageSource(body.side_b) },
-  ].filter((i) => i.src);
-  const hasDeadwax = !!imageSource(body.deadwax);
+  ].filter((i) => i.src && (!quick || i.role === "front cover"));
+  const hasDeadwax = !quick && !!imageSource(body.deadwax);
 
   // The label close-up goes in as an overview plus four magnified quadrants so
   // the etched matrix text is legible to the model. If tiling fails for any
@@ -109,6 +112,9 @@ export async function POST(req: NextRequest) {
   content.push({
     type: "text",
     text:
+      (quick
+        ? "QUICK CHECK: only the front cover is attached. No back cover, disc or runout photos. Identify the release from the cover alone, set pressing_details.uncertainty and is_first_pressing from the cover, and set media_condition_a and media_condition_b to null. Do not guess grades. "
+        : "") +
       "You are a vinyl record cataloguer grading to the Goldmine Standard. " +
       "Grade each disc side SEPARATELY by inspecting its surface for scratches, scuffs, and wear, " +
       "using these exact criteria (best to worst):\n" +
