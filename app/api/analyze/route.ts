@@ -338,15 +338,15 @@ export async function POST(req: NextRequest) {
     deadwaxReason = "Runout already read — pressing is confirmed.";
   } else if (massProduced && valueCeiling < 3000 && !aiUnsure) {
     deadwaxRecommended = false;
-    deadwaxReason = "Mass-produced common pressing — the runout won't change the value. Skip it.";
+    deadwaxReason = "Mass-produced common pressing - the runout won't change the value. Skip it.";
   } else if (aiUnsure || valueCeiling >= 4000) {
     deadwaxRecommended = true;
     deadwaxReason = aiUnsure
-      ? "The pressing can't be pinned down from the labels — a runout close-up could confirm it and move the value."
-      : "This could be a valuable pressing — a runout close-up confirms first-vs-reissue and tightens the value.";
+      ? "The pressing can't be pinned down from the labels - a runout close-up could confirm it and move the value."
+      : "This could be a valuable pressing - a runout close-up confirms first-vs-reissue and tightens the value.";
   } else {
     deadwaxRecommended = false;
-    deadwaxReason = "Pressing is clear enough from the labels — the runout is optional.";
+    deadwaxReason = "Pressing is clear enough from the labels - the runout is optional.";
   }
 
   const enrichedPressing = parsed.pressing_details
