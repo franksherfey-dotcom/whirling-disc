@@ -31,6 +31,13 @@ const SORTS: { key: SortKey; label: string }[] = [
 
 const decadeOf = (y?: number | null) => (y == null ? null : `${Math.floor(y / 10) * 10}s`);
 
+// A runout photo was taken but the etched numbers weren't read (or the photo
+// failed to save). The record is still in the crate; this flags it for a retake.
+function runoutUnread(r: { deadwax_url?: string | null; pressing_details?: { runout_unread?: boolean | null; matrix_legible?: boolean | null } | null }): boolean {
+  if (r.pressing_details?.runout_unread === true) return true;
+  return !!r.deadwax_url && r.pressing_details?.matrix_legible === false;
+}
+
 export default function RecordsPage() {
   const [records, setRecords] = useState<VinylRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,6 +46,7 @@ export default function RecordsPage() {
   const [decade, setDecade] = useState("all");
   const [grade, setGrade] = useState("all");
   const [box, setBox] = useState("all");
+  const [runout, setRunout] = useState("all"); // "unread" = runout photo couldn't be read
   const [firstPressOnly, setFirstPressOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
 
@@ -96,6 +104,7 @@ export default function RecordsPage() {
     setDecade("all");
     setGrade("all");
     setBox("all");
+    setRunout("all");
     setFirstPressOnly(false);
   };
 
@@ -123,6 +132,7 @@ export default function RecordsPage() {
     });
     return Array.from(s).sort();
   }, [records]);
+  const runoutUnreadCount = useMemo(() => records.filter(runoutUnread).length, [records]);
   const unboxedCount = useMemo(() => records.filter((r) => !(r.location || "").trim()).length, [records]);
 
   const filtered = useMemo(() => {
@@ -136,6 +146,7 @@ export default function RecordsPage() {
         const b = (r.location || "").trim();
         if (box === "__none__" ? b !== "" : b !== box) return false;
       }
+      if (runout === "unread" && !runoutUnread(r)) return false;
       if (firstPressOnly && r.pressing_details?.is_first_pressing !== true) return false;
       return true;
     });
@@ -261,6 +272,12 @@ export default function RecordsPage() {
           <option value="all">Any media grade</option>
           {GRADE_RANK.map((g) => <option key={g} value={g}>{GRADE_LABELS[g]}</option>)}
         </Select>
+        {runoutUnreadCount > 0 && (
+          <Select value={runout} onChange={setRunout} label="runout">
+            <option value="all">All records</option>
+            <option value="unread">Runout not read ({runoutUnreadCount})</option>
+          </Select>
+        )}
         {(boxOptions.length > 0 || unboxedCount > 0) && (
           <Select value={box} onChange={setBox} label="box">
             <option value="all">📦 All boxes</option>

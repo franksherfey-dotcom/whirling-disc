@@ -258,13 +258,23 @@ export default function AddRecordPage() {
       }
 
       // The AI grades the first disc's two sides (representative of the set).
-      const res = await fetch("/api/analyze", {
+      // If the runout close-up is what breaks the valuation, value the record
+      // without it, so it still catalogs, and flag it for a retake.
+      let runoutUnread = false;
+      const askAi = (withDeadwax: boolean) => fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ front, back, side_a: firstDiscA, side_b: firstDiscB, deadwax: deadwax || undefined }),
+        body: JSON.stringify({ front, back, side_a: firstDiscA, side_b: firstDiscB, deadwax: withDeadwax ? deadwax || undefined : undefined }),
       });
-      const ai = await res.json();
+      let res = await askAi(true);
+      let ai = await res.json().catch(() => ({}));
+      if (!res.ok && deadwax) {
+        runoutUnread = true;
+        res = await askAi(false);
+        ai = await res.json().catch(() => ({}));
+      }
       if (!res.ok) throw new Error(ai?.error || "Could not value this record.");
+      if (deadwax && ai.pressing_details?.matrix_legible !== true) runoutUnread = true;
 
       setStatus("saving");
       const collectionId = await resolveTargetCollectionId(user.id);
@@ -288,6 +298,12 @@ export default function AddRecordPage() {
           const u = await track(discLabel(i), `disc-${i}`, discPhotos[i]);
           if (u) discUrls.push(u);
         }
+      }
+      // A runout photo that didn't upload doesn't block the record; it's flagged.
+      const deadwaxFailed = failed.indexOf("Label close-up, Side A");
+      if (deadwaxFailed >= 0) {
+        failed.splice(deadwaxFailed, 1);
+        runoutUnread = true;
       }
       if (failed.length) {
         throw new PhotoProblem(`Retake ${failed.join(", ")}. ${failed.length > 1 ? "Those photos" : "That photo"} didn't upload. Check your connection, retake, then tap Value it & add again.`);
@@ -324,7 +340,9 @@ export default function AddRecordPage() {
         summary: ai.summary ?? null,
         condition_notes: ai.condition_notes ?? null,
         reasoning: ai.reasoning ?? null,
-        pressing_details: ai.pressing_details ?? null,
+        pressing_details: ai.pressing_details
+          ? { ...ai.pressing_details, runout_unread: runoutUnread }
+          : (runoutUnread ? { runout_unread: true } : null),
         cover_url: coverUrl,
         back_url: backUrl,
         side_a_url: discUrls[0],
