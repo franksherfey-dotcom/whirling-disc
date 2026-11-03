@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 90; // same budget as /api/analyze: the re-read calls the model and Discogs
 
 function dbGrade(g: any): string | null {
   const map: Record<string, string> = { "VG+": "VGP", "G+": "GP" };

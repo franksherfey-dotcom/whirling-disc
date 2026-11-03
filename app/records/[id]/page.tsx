@@ -12,6 +12,15 @@ import Link from "next/link";
 
 const usd = (c?: number | null) => (c == null ? "—" : `$${Math.round(c / 100).toLocaleString()}`);
 
+// "Load failed" (Safari) and "Failed to fetch" (Chrome) mean the connection
+// dropped before the server answered, usually a slow analysis timing out.
+function friendlyError(msg: string): string {
+  if (/load failed|failed to fetch|networkerror|network connection/i.test(msg)) {
+    return "The connection dropped before the photo finished reading. Check your signal and try again. The record is unchanged.";
+  }
+  return msg;
+}
+
 export default function RecordDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [rec, setRec] = useState<VinylRecord | null>(null);
@@ -50,7 +59,7 @@ export default function RecordDetailPage() {
         setTightenNote(null); // the retake box below explains what to do
       }
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyError((e as Error).message));
     } finally {
       setReappraising(false);
     }
@@ -73,7 +82,7 @@ export default function RecordDetailPage() {
       const { data } = await supabase.from("records").select("*").eq("id", id).single();
       setRec(data);
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyError((e as Error).message));
     } finally {
       setReappraising(false);
     }

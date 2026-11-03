@@ -125,9 +125,26 @@ export default function AddRecordPage() {
           .from("records").select("location").eq("collection_id", match.id).not("location", "is", null);
         const boxes = Array.from(new Set((data || []).map((r) => (r.location || "").trim()).filter(Boolean))).sort();
         setBoxOptions(boxes);
+        // Keep adding to the box you were using last time, until you start a new one.
+        const saved = localStorage.getItem(`wd-current-box:${match.id}`);
+        if (saved) setBox(saved);
       }
     })();
   }, []);
+
+  // The box a new record goes into. Remembered per crate on this device.
+  const rememberBox = (name: string) => {
+    setBox(name);
+    if (targetCrate) localStorage.setItem(`wd-current-box:${targetCrate.id}`, name);
+  };
+  const startNewBox = () => {
+    // Next number after the highest "Box N" already in this crate.
+    const nums = boxOptions.map((b) => { const m = b.match(/(\d+)\s*$/); return m ? parseInt(m[1], 10) : 0; });
+    const next = Math.max(0, ...nums) + 1;
+    const name = `Box ${next}`;
+    setBoxOptions((prev) => Array.from(new Set([...prev, name])).sort());
+    rememberBox(name);
+  };
 
   const totalDiscSlots = discCount * 2;
 
@@ -394,10 +411,17 @@ export default function AddRecordPage() {
       {/* Which physical box this record goes in — labeled as you catalog */}
       <div className="rounded-2xl px-5 py-4 mb-6" style={{ background: "var(--wd-surface)", border: "1px solid var(--wd-border)" }}>
         <p className="text-sm font-semibold mb-1" style={{ color: "var(--wd-text)" }}>📦 Box / storage location</p>
-        <p className="text-[11px] mb-3" style={{ color: "var(--wd-text-faint)" }}>Where this record is stored, e.g. &ldquo;Box 1&rdquo; or &ldquo;Shelf B.&rdquo; Optional.</p>
+        <p className="text-[11px] mb-3" style={{ color: "var(--wd-text-faint)" }}>
+          {box.trim() ? <>New records go into <span style={{ color: "var(--wd-gold)" }}>{box.trim()}</span> until you start a new box.</> : "Where this record is stored, e.g. “Box 1” or “Shelf B.” Optional."}
+        </p>
+        <div className="flex gap-2 mb-3">
+          <button type="button" onClick={startNewBox} className="px-4 py-2.5 rounded-xl font-eyebrow text-xs flex-shrink-0" style={{ background: "var(--wd-gold)", color: "#0d0d0d" }}>
+            + Start new box
+          </button>
+        </div>
         <input
           value={box}
-          onChange={(e) => setBox(e.target.value)}
+          onChange={(e) => rememberBox(e.target.value)}
           list="wd-box-options"
           placeholder="Box 1"
           className="wd-input w-full px-4 py-3 rounded-xl text-sm"
