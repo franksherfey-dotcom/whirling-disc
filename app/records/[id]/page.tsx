@@ -201,15 +201,36 @@ export default function RecordDetailPage() {
       {/* Pressing details — the identification that drives value */}
       {rec.pressing_details && (rec.pressing_details.identification || rec.pressing_details.matrix_runout || rec.pressing_details.distinguishing_marks) && (
         <div className="rounded-2xl p-6 mb-4" style={{ background: "var(--wd-surface)", border: "1px solid var(--wd-border)" }}>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
             <p className="font-eyebrow text-xs" style={{ color: "var(--wd-text-faint)" }}>Pressing details</p>
-            {rec.pressing_details.is_first_pressing === true && (
-              <span className="font-eyebrow text-[10px] px-3 py-1 rounded-full" style={{ background: "rgba(201,162,39,0.15)", color: "var(--wd-gold)", border: "1px solid var(--wd-gold)" }}>First pressing</span>
-            )}
-            {rec.pressing_details.is_first_pressing === false && (
-              <span className="font-eyebrow text-[10px] px-3 py-1 rounded-full" style={{ color: "var(--wd-text-faint)", border: "1px solid var(--wd-border)" }}>Later pressing / reissue</span>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {rec.pressing_details.scarcity === "scarce" && (
+                <span title={rec.pressing_details.num_for_sale != null ? `Only ~${rec.pressing_details.num_for_sale} copies listed on Discogs` : undefined} className="font-eyebrow text-[10px] px-3 py-1 rounded-full" style={{ background: "rgba(201,162,39,0.15)", color: "var(--wd-gold)", border: "1px solid var(--wd-gold)" }}>✦ Scarce</span>
+              )}
+              {rec.pressing_details.scarcity === "uncommon" && (
+                <span title={rec.pressing_details.num_for_sale != null ? `~${rec.pressing_details.num_for_sale} copies listed on Discogs` : undefined} className="font-eyebrow text-[10px] px-3 py-1 rounded-full" style={{ color: "var(--wd-text-dim)", border: "1px solid var(--wd-border)" }}>Uncommon</span>
+              )}
+              {rec.pressing_details.mass_produced === true && (
+                <span title={rec.pressing_details.num_for_sale != null ? `~${rec.pressing_details.num_for_sale} copies listed on Discogs` : undefined} className="font-eyebrow text-[10px] px-3 py-1 rounded-full" style={{ color: "var(--wd-text-faint)", border: "1px solid var(--wd-border)" }}>Mass-produced</span>
+              )}
+              {rec.pressing_details.is_first_pressing === true && (
+                <span className="font-eyebrow text-[10px] px-3 py-1 rounded-full" style={{ background: "rgba(201,162,39,0.15)", color: "var(--wd-gold)", border: "1px solid var(--wd-gold)" }}>First pressing</span>
+              )}
+              {rec.pressing_details.is_first_pressing === false && (
+                <span className="font-eyebrow text-[10px] px-3 py-1 rounded-full" style={{ color: "var(--wd-text-faint)", border: "1px solid var(--wd-border)" }}>Later pressing / reissue</span>
+              )}
+            </div>
           </div>
+          {rec.pressing_details.deadwax_reason && !rec.deadwax_url && (
+            <div className="mb-3 px-3 py-2.5 rounded-xl text-xs leading-relaxed" style={rec.pressing_details.deadwax_recommended
+              ? { background: "rgba(176,40,28,0.10)", color: "var(--wd-text-dim)", border: "1px solid rgba(176,40,28,0.3)" }
+              : { background: "var(--wd-surface-2)", color: "var(--wd-text-dim)" }}>
+              <span style={{ color: rec.pressing_details.deadwax_recommended ? "var(--wd-red-bright, #e0503f)" : "var(--wd-text-faint)" }}>
+                {rec.pressing_details.deadwax_recommended ? "📷 Worth a runout shot: " : "Runout optional: "}
+              </span>
+              {rec.pressing_details.deadwax_reason}
+            </div>
+          )}
           {rec.pressing_details.identification && (
             <p className="text-sm leading-relaxed mb-3" style={{ color: "var(--wd-text)" }}>{rec.pressing_details.identification}</p>
           )}

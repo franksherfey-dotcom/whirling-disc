@@ -71,31 +71,90 @@ async function dget(path: string, token: string): Promise<any | null> {
   return null;
 }
 
+const onlyDigits = (s?: string | null) => (s ? s.replace(/\D/g, "") : "");
+const last4 = (s?: string | null) => {
+  const d = onlyDigits(s);
+  return d ? d.slice(-4) : "";
+};
+
+// Score a Discogs search result against what we asked for. Taking results[0]
+// blindly often matched an original pressing to a cheap later reissue (or a
+// foreign pressing), which then priced the record wrong. We rank instead.
+function scoreResult(
+  r: any,
+  opts: { catalog_number?: string | null; year?: number | null; country?: string | null }
+): number {
+  let s = 0;
+  // Catalog number is the strongest discriminator between pressings.
+  if (opts.catalog_number) {
+    const want = onlyDigits(opts.catalog_number);
+    const wantL4 = last4(opts.catalog_number);
+    const got = Array.isArray(r.catno) ? r.catno.join(" ") : (r.catno || "");
+    const gotDigits = onlyDigits(got);
+    if (want && gotDigits === want) s += 60;
+    else if (wantL4 && last4(got) === wantL4) s += 45;
+    else if (wantL4 && gotDigits.includes(wantL4)) s += 20;
+  }
+  // Year proximity — an original pressing should match its own year closely.
+  if (opts.year && r.year) {
+    const diff = Math.abs(Number(r.year) - opts.year);
+    if (diff === 0) s += 25;
+    else if (diff <= 1) s += 15;
+    else if (diff <= 3) s += 6;
+    else s -= Math.min(20, diff); // penalize a far-off-year (likely a reissue)
+  }
+  // Country — these are US RCA/Imperial pressings; prefer US, lightly.
+  const country = (r.country || "").toString();
+  if (opts.country && country) {
+    if (country.toLowerCase() === opts.country.toLowerCase()) s += 8;
+  } else if (country === "US") {
+    s += 4;
+  }
+  // Having marketplace activity means we can actually price it.
+  if (typeof r.community?.have === "number") s += Math.min(5, r.community.have / 50);
+  return s;
+}
+
 /** Find the best matching release id from artist/title/catalog. */
 export async function matchRelease(opts: {
   artist?: string | null;
   title?: string | null;
   catalog_number?: string | null;
   year?: number | null;
+  country?: string | null;
 }): Promise<DiscogsMatch | null> {
   const token = process.env.DISCOGS_TOKEN;
   if (!token) return null;
 
-  const params = new URLSearchParams({ type: "release", per_page: "5" });
+  const params = new URLSearchParams({ type: "release", per_page: "10" });
   if (opts.artist) params.set("artist", opts.artist);
   if (opts.title) params.set("release_title", opts.title);
   if (opts.catalog_number) params.set("catno", opts.catalog_number);
-  if (opts.year) params.set("year", String(opts.year));
+  // Deliberately do NOT constrain by year in the query — we want to see other
+  // pressings so we can score and pick the right one, not force the first hit.
 
   const data = await dget(`/database/search?${params.toString()}`, token);
-  const first = data?.results?.[0];
-  if (!first?.id) return null;
+  let results: any[] = Array.isArray(data?.results) ? data.results.filter((r: any) => r?.id) : [];
+
+  // If a catalog-number search returned nothing, retry without it (OCR of a
+  // catalog number is error-prone) so we still get a title/artist match.
+  if (results.length === 0 && opts.catalog_number) {
+    const p2 = new URLSearchParams({ type: "release", per_page: "10" });
+    if (opts.artist) p2.set("artist", opts.artist);
+    if (opts.title) p2.set("release_title", opts.title);
+    const d2 = await dget(`/database/search?${p2.toString()}`, token);
+    results = Array.isArray(d2?.results) ? d2.results.filter((r: any) => r?.id) : [];
+  }
+  if (results.length === 0) return null;
+
+  results.sort((a, b) => scoreResult(b, opts) - scoreResult(a, opts));
+  const best = results[0];
 
   return {
-    releaseId: first.id,
-    releaseUrl: `https://www.discogs.com/release/${first.id}`,
-    title: first.title || `${opts.artist} - ${opts.title}`,
-    year: first.year ? Number(first.year) : opts.year ?? null,
+    releaseId: best.id,
+    releaseUrl: `https://www.discogs.com/release/${best.id}`,
+    title: best.title || `${opts.artist} - ${opts.title}`,
+    year: best.year ? Number(best.year) : opts.year ?? null,
   };
 }
 

@@ -42,13 +42,18 @@ export function blendValue(input: {
   };
 
   // Collect the "point" estimates each real source provides.
+  //
+  // IMPORTANT: discogsLowCents is the single cheapest copy currently listed on
+  // the marketplace (any condition, often a beat-up or dumped copy). It is a
+  // FLOOR, never a valuation. Using it as the center is what produced $0.12
+  // "values" for collectible records. We price off Discogs' condition-based
+  // price *suggestion* (what the record is worth at this grade) and the eBay
+  // median; the lowest listing only keeps a sane floor and stays in the
+  // breakdown for reference.
   const points: number[] = [];
   const marketSources: ("discogs" | "ebay")[] = [];
   if (input.discogsSuggestionCents) {
     points.push(input.discogsSuggestionCents);
-    marketSources.push("discogs");
-  } else if (input.discogsLowCents) {
-    points.push(input.discogsLowCents);
     marketSources.push("discogs");
   }
   if (input.ebayMedianCents) {
@@ -56,10 +61,17 @@ export function blendValue(input: {
     marketSources.push("ebay");
   }
 
-  // No market data → fall back to the AI photo range.
+  // No trustworthy market center → fall back to the AI photo range. A lone
+  // lowest listing does not override the AI estimate; it only lifts the floor
+  // if the AI somehow came in below the cheapest copy actually for sale.
   if (points.length === 0) {
-    const low = input.aiLowCents ?? 0;
-    const high = input.aiHighCents ?? 0;
+    let low = input.aiLowCents ?? 0;
+    let high = input.aiHighCents ?? 0;
+    if (input.discogsLowCents && low > 0 && input.discogsLowCents > high && high > 0) {
+      // Cheapest real copy sits above our whole estimate — nudge the ceiling up
+      // to meet it so we don't under-report, but keep the AI low as the floor.
+      high = input.discogsLowCents;
+    }
     return {
       low_cents: low,
       high_cents: high,

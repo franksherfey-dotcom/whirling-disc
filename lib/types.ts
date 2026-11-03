@@ -43,6 +43,11 @@ export interface Record {
     distinguishing_marks?: string | null;
     uncertainty?: string | null;
     matrix_legible?: boolean | null;
+    num_for_sale?: number | null;
+    scarcity?: "common" | "uncommon" | "scarce" | null;
+    mass_produced?: boolean | null;
+    deadwax_recommended?: boolean | null;
+    deadwax_reason?: string | null;
   } | null;
   created_at: string;
   updated_at: string;

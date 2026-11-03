@@ -272,6 +272,7 @@ export async function POST(req: NextRequest) {
       title: parsed.title,
       catalog_number: parsed.catalog_number,
       year: parsed.year,
+      country: parsed.country,
     });
     if (match) {
       discogsUrl = match.releaseUrl;
@@ -310,8 +311,58 @@ export async function POST(req: NextRequest) {
     pressingConfident,
   });
 
+  // --- Rarity signal + deadwax recommendation -------------------------------
+  // How common is this record on the open market? Discogs num_for_sale is the
+  // best cheap proxy: dozens of copies listed = mass-produced; a handful =
+  // scarce. We fold this into a plain-language signal the collector sees
+  // upfront, and use it (with the AI's own pressing uncertainty and the value
+  // ceiling) to recommend whether capturing the runout/deadwax is worth it.
+  const numForSale = discogs?.numForSale ?? null;
+  let scarcity: "common" | "uncommon" | "scarce" | null = null;
+  if (numForSale != null) {
+    scarcity = numForSale >= 50 ? "common" : numForSale >= 12 ? "uncommon" : "scarce";
+  }
+  const massProduced = scarcity === "common";
+  const valueCeiling = blended.high_cents;
+  const matrixLegible = parsed.pressing_details?.matrix_legible === true;
+  const aiUnsure = !!parsed.pressing_details?.uncertainty || parsed.pressing_details?.is_first_pressing === null;
+
+  // Recommend the runout shot when it could actually move the number: the AI
+  // couldn't pin the pressing, OR the record is valuable enough ($40+ ceiling)
+  // that confirming first-vs-reissue matters — UNLESS it's clearly a common,
+  // low-value record where the runout changes nothing.
+  let deadwaxRecommended: boolean;
+  let deadwaxReason: string;
+  if (matrixLegible) {
+    deadwaxRecommended = false;
+    deadwaxReason = "Runout already read — pressing is confirmed.";
+  } else if (massProduced && valueCeiling < 3000 && !aiUnsure) {
+    deadwaxRecommended = false;
+    deadwaxReason = "Mass-produced common pressing — the runout won't change the value. Skip it.";
+  } else if (aiUnsure || valueCeiling >= 4000) {
+    deadwaxRecommended = true;
+    deadwaxReason = aiUnsure
+      ? "The pressing can't be pinned down from the labels — a runout close-up could confirm it and move the value."
+      : "This could be a valuable pressing — a runout close-up confirms first-vs-reissue and tightens the value.";
+  } else {
+    deadwaxRecommended = false;
+    deadwaxReason = "Pressing is clear enough from the labels — the runout is optional.";
+  }
+
+  const enrichedPressing = parsed.pressing_details
+    ? {
+        ...parsed.pressing_details,
+        num_for_sale: numForSale,
+        scarcity,
+        mass_produced: massProduced,
+        deadwax_recommended: deadwaxRecommended,
+        deadwax_reason: deadwaxReason,
+      }
+    : parsed.pressing_details;
+
   return NextResponse.json({
     ...parsed,
+    pressing_details: enrichedPressing,
     // Blended value overrides the raw AI range; AI range preserved in breakdown.
     value_low_usd: blended.low_cents / 100,
     value_high_usd: blended.high_cents / 100,
