@@ -168,6 +168,28 @@ export default function AddRecordPage() {
     return discCount > 1 ? `Disc ${disc} — Side ${side}` : `Disc — Side ${side}`;
   };
 
+  // Turn raw browser/SDK errors into something a person can act on. The
+  // underlying message (e.g. "The string did not match the expected pattern")
+  // is a low-level failure, almost always a photo that didn't encode cleanly;
+  // we keep it in the console for debugging and show guidance instead.
+  const friendlyError = (e: unknown): string => {
+    const raw = (e as Error)?.message || String(e);
+    const low = raw.toLowerCase();
+    if (raw === "SIGNED_OUT" || low.includes("jwt") || low.includes("not signed in") || low.includes("auth"))
+      return "You've been signed out. Please sign in again, then re-add this record.";
+    if (low.includes("did not match the expected pattern") || low.includes("data url") || low.includes("base64") || low.includes("blob"))
+      return "One of the photos didn't save correctly — usually a dark or blurry shot. Tap any photo above to retake it, then tap Value it & add again.";
+    if (low.includes("failed to fetch") || low.includes("networkerror") || low.includes("load failed") || low.includes("timeout") || low.includes("reach"))
+      return "Couldn't reach the valuation service. Check your internet connection and try again — your photos are still here.";
+    if (low.includes("could not value") || low.includes("could not read") || low.includes("malformed"))
+      return "We couldn't read the record from these photos. Retake the front cover and the Side A label so the text is sharp and well-lit, then try again.";
+    if (low.includes("free_limit")) return "You've reached the free limit. Upgrade to add more records.";
+    if (low.includes("storage") || low.includes("upload"))
+      return "A photo didn't upload. Check your connection and try again; if it keeps happening, retake that photo.";
+    // Unknown: give a human sentence but keep a short technical hint for reports.
+    return `Something went wrong saving this record. Try again, and if it keeps happening, retake the photos. (${raw.slice(0, 80)})`;
+  };
+
   const analyzeAndSave = async () => {
     setError(null);
     setStatus("analyzing");
@@ -251,7 +273,8 @@ export default function AddRecordPage() {
 
       router.push("/records");
     } catch (e) {
-      setError((e as Error).message);
+      console.error("add record failed:", e);
+      setError(friendlyError(e));
       setStatus("idle");
     }
   };
