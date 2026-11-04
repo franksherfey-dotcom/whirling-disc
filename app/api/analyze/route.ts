@@ -11,6 +11,8 @@ export const maxDuration = 90;
 type Body = {
   // Quick check: front cover only, returns the runout recommendation before the rest of the photos are taken.
   quick?: boolean;
+  // Still shrink-wrapped: front and back covers only, no disc or runout photos.
+  sealed?: boolean;
   front?: string;
   back?: string;
   side_a?: string;
@@ -60,6 +62,8 @@ export async function POST(req: NextRequest) {
   }
 
   const quick = body.quick === true;
+  // Sealed copies are still shrink-wrapped: no disc or runout photos exist.
+  const sealed = body.sealed === true;
   const images = [
     { role: "front cover", src: imageSource(body.front) },
     { role: "back cover", src: imageSource(body.back) },
@@ -114,6 +118,9 @@ export async function POST(req: NextRequest) {
     text:
       (quick
         ? "QUICK CHECK: only the front cover is attached. No back cover, disc or runout photos. Identify the release from the cover alone, set pressing_details.uncertainty and is_first_pressing from the cover, and set media_condition_a and media_condition_b to null. Do not guess grades. "
+        : "") +
+      (sealed
+        ? "SEALED COPY: the record is still shrink-wrapped, so no disc or runout photos are attached. Identify the release from the covers and any printed or sticker text only. Set pressing_details.sealed to true, set pressing_details.uncertainty to say the pressing was identified from the jacket alone, set media_condition_a and media_condition_b to null, and do not grade the discs. "
         : "") +
       "You are a vinyl record cataloguer grading to the Goldmine Standard. " +
       "Grade each disc side SEPARATELY by inspecting its surface for scratches, scuffs, and wear, " +

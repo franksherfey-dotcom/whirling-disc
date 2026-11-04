@@ -90,6 +90,8 @@ export default function AddRecordPage() {
   // Optional close-up of the runout etching. Lets the AI commit to one pressing
   // up front instead of flagging uncertainty and asking for it later.
   const [deadwax, setDeadwax] = useState<string | null>(null);
+  // Sealed copies are still shrink-wrapped: value from the jacket, no disc photos.
+  const [sealed, setSealed] = useState(false);
   // Disc photos: 2 per disc, indexed [disc0sideA, disc0sideB, disc1sideA, disc1sideB, ...]
   const [discPhotos, setDiscPhotos] = useState<Record<number, string>>({});
   const [status, setStatus] = useState<"idle" | "analyzing" | "saving">("idle");
@@ -207,7 +209,7 @@ export default function AddRecordPage() {
   const firstDiscA = discPhotos[0];
   const firstDiscB = discPhotos[1];
   // Need front cover + at least one disc side of the first disc.
-  const canAnalyze = !!front && (!!firstDiscA || !!firstDiscB) && status === "idle";
+  const canAnalyze = !!front && (sealed || !!firstDiscA || !!firstDiscB) && status === "idle";
 
   const discLabel = (idx: number) => {
     const disc = Math.floor(idx / 2) + 1;
@@ -264,7 +266,14 @@ export default function AddRecordPage() {
       const askAi = (withDeadwax: boolean) => fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ front, back, side_a: firstDiscA, side_b: firstDiscB, deadwax: withDeadwax ? deadwax || undefined : undefined }),
+        body: JSON.stringify({
+          front,
+          back,
+          sealed,
+          side_a: sealed ? undefined : firstDiscA,
+          side_b: sealed ? undefined : firstDiscB,
+          deadwax: !sealed && withDeadwax ? deadwax || undefined : undefined,
+        }),
       });
       let res = await askAi(true);
       let ai = await res.json().catch(() => ({}));
@@ -323,7 +332,8 @@ export default function AddRecordPage() {
         rpm: ai.rpm ?? null,
         country: ai.country ?? null,
         genres: Array.isArray(ai.genres) && ai.genres.length ? ai.genres : null,
-        media_condition: toDbGrade(mediaAvg),
+        // A sealed copy is not inspected, so store "M" rather than a grade from discs we never saw.
+        media_condition: toDbGrade(sealed ? "M" : mediaAvg),
         media_condition_a: ai.media_condition_a ? toDbGrade(ai.media_condition_a) : null,
         media_condition_b: ai.media_condition_b ? toDbGrade(ai.media_condition_b) : null,
         side_a_label: ai.side_a_label ?? null,
@@ -340,9 +350,11 @@ export default function AddRecordPage() {
         summary: ai.summary ?? null,
         condition_notes: ai.condition_notes ?? null,
         reasoning: ai.reasoning ?? null,
-        pressing_details: ai.pressing_details
-          ? { ...ai.pressing_details, runout_unread: runoutUnread }
-          : (runoutUnread ? { runout_unread: true } : null),
+        pressing_details: sealed
+          ? { ...(ai.pressing_details ?? {}), sealed: true, runout_unread: false }
+          : ai.pressing_details
+            ? { ...ai.pressing_details, runout_unread: runoutUnread }
+            : (runoutUnread ? { runout_unread: true } : null),
         cover_url: coverUrl,
         back_url: backUrl,
         side_a_url: discUrls[0],
@@ -500,6 +512,23 @@ export default function AddRecordPage() {
         </div>
       )}
 
+      {/* Sealed toggle: the record is still shrink-wrapped, so there are no discs to photograph */}
+      <button
+        type="button"
+        onClick={() => setSealed((s) => !s)}
+        aria-pressed={sealed}
+        className="w-full mb-6 px-4 py-3 rounded-2xl text-left text-sm"
+        style={{ background: sealed ? "rgba(201,162,39,0.12)" : "var(--wd-surface)", border: `1px solid ${sealed ? "var(--wd-gold)" : "var(--wd-border)"}`, color: "var(--wd-text)" }}
+      >
+        <span className="font-eyebrow text-[11px] block mb-1" style={{ color: sealed ? "var(--wd-gold)" : "var(--wd-text-faint)" }}>
+          {sealed ? "Sealed copy: on" : "Still sealed?"}
+        </span>
+        {sealed
+          ? "Valued from the jacket. Disc and runout photos are skipped, and the value assumes the wrap is intact."
+          : "Tap if the shrink wrap is still on. You won't need to open it."}
+      </button>
+
+      {!sealed && (<>
       {/* Disc photos — 2 per disc, generated from disc count */}
       <p className="font-eyebrow text-[11px] mb-3" style={{ color: "var(--wd-text-faint)" }}>
         {discCount > 1 ? `Discs (${discCount} records, ${totalDiscSlots} photos)` : "Disc"}
@@ -532,6 +561,7 @@ export default function AddRecordPage() {
         </div>
       </div>
       <div className="mb-6" />
+      </>)}
 
       {error === "SIGNED_OUT" ? (
         <div className="px-4 py-4 rounded-xl mb-4 text-sm text-center" style={{ background: "rgba(201,162,39,0.1)", border: "1px solid var(--wd-gold)", color: "var(--wd-text)" }}>
@@ -548,8 +578,10 @@ export default function AddRecordPage() {
         Value it &amp; add to crate
       </button>
       <p className="text-center text-xs mt-3" style={{ color: "var(--wd-text-faint)" }}>
-        Front cover and at least one disc side required · back cover optional
-        {discCount > 1 ? ` · photograph all ${discCount} discs for your records` : ""}
+        {sealed
+          ? "Front cover required · back cover optional"
+          : "Front cover and at least one disc side required · back cover optional"}
+        {!sealed && discCount > 1 ? ` · photograph all ${discCount} discs for your records` : ""}
       </p>
     </div>
   );

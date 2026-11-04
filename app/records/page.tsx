@@ -33,7 +33,9 @@ const decadeOf = (y?: number | null) => (y == null ? null : `${Math.floor(y / 10
 
 // A runout photo was taken but the etched numbers weren't read (or the photo
 // failed to save). The record is still in the crate; this flags it for a retake.
-function runoutUnread(r: { deadwax_url?: string | null; pressing_details?: { runout_unread?: boolean | null; matrix_legible?: boolean | null } | null }): boolean {
+function runoutUnread(r: { deadwax_url?: string | null; pressing_details?: { runout_unread?: boolean | null; matrix_legible?: boolean | null; sealed?: boolean | null } | null }): boolean {
+  // Sealed copies have no disc to read, so a missing runout is expected, not a failed scan.
+  if (r.pressing_details?.sealed === true) return false;
   if (r.pressing_details?.runout_unread === true) return true;
   return !!r.deadwax_url && r.pressing_details?.matrix_legible === false;
 }
