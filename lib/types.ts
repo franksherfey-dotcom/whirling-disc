@@ -48,6 +48,7 @@ export interface Record {
     mass_produced?: boolean | null;
     deadwax_recommended?: boolean | null;
     deadwax_reason?: string | null;
+    cover_only?: boolean | null;
   } | null;
   created_at: string;
   updated_at: string;
