@@ -48,7 +48,8 @@ export default function RecordsPage() {
   const [decade, setDecade] = useState("all");
   const [grade, setGrade] = useState("all");
   const [box, setBox] = useState("all");
-  const [runout, setRunout] = useState("all"); // "unread" = runout photo couldn't be read
+  const [runout, setRunout] = useState("all");
+  const [vinyl, setVinyl] = useState("all"); // "cover" = sleeve with no record in it // "unread" = runout photo couldn't be read
   const [firstPressOnly, setFirstPressOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
 
@@ -107,6 +108,7 @@ export default function RecordsPage() {
     setGrade("all");
     setBox("all");
     setRunout("all");
+    setVinyl("all");
     setFirstPressOnly(false);
   };
 
@@ -135,6 +137,7 @@ export default function RecordsPage() {
     return Array.from(s).sort();
   }, [records]);
   const runoutUnreadCount = useMemo(() => records.filter(runoutUnread).length, [records]);
+  const coverOnlyCount = useMemo(() => records.filter((r) => r.pressing_details?.cover_only === true).length, [records]);
   const unboxedCount = useMemo(() => records.filter((r) => !(r.location || "").trim()).length, [records]);
 
   const filtered = useMemo(() => {
@@ -149,6 +152,7 @@ export default function RecordsPage() {
         if (box === "__none__" ? b !== "" : b !== box) return false;
       }
       if (runout === "unread" && !runoutUnread(r)) return false;
+      if (vinyl === "cover" && r.pressing_details?.cover_only !== true) return false;
       if (firstPressOnly && r.pressing_details?.is_first_pressing !== true) return false;
       return true;
     });
@@ -274,6 +278,12 @@ export default function RecordsPage() {
           <option value="all">Any media grade</option>
           {GRADE_RANK.map((g) => <option key={g} value={g}>{GRADE_LABELS[g]}</option>)}
         </Select>
+        {coverOnlyCount > 0 && (
+          <Select value={vinyl} onChange={setVinyl} label="vinyl">
+            <option value="all">All records</option>
+            <option value="cover">Cover only, no record ({coverOnlyCount})</option>
+          </Select>
+        )}
         {runoutUnreadCount > 0 && (
           <Select value={runout} onChange={setRunout} label="runout">
             <option value="all">All records</option>

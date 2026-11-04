@@ -9,6 +9,8 @@ export const runtime = "nodejs";
 export const maxDuration = 90;
 
 type Body = {
+  // Cover only: the sleeve with no record in it; only the covers are sent.
+  cover_only?: boolean;
   // Quick check: front cover only, returns the runout recommendation before the rest of the photos are taken.
   quick?: boolean;
   // Still shrink-wrapped: front and back covers only, no disc or runout photos.
@@ -64,13 +66,15 @@ export async function POST(req: NextRequest) {
   const quick = body.quick === true;
   // Sealed copies are still shrink-wrapped: no disc or runout photos exist.
   const sealed = body.sealed === true;
+  // Cover only: the sleeve with no record in it. Only the covers are sent.
+  const coverOnly = body.cover_only === true;
   const images = [
     { role: "front cover", src: imageSource(body.front) },
     { role: "back cover", src: imageSource(body.back) },
     { role: "disc side A", src: imageSource(body.side_a) },
     { role: "disc side B", src: imageSource(body.side_b) },
-  ].filter((i) => i.src && (!quick || i.role === "front cover"));
-  const hasDeadwax = !quick && !!imageSource(body.deadwax);
+  ].filter((i) => i.src && (!quick || i.role === "front cover") && (!coverOnly || i.role.endsWith("cover")));
+  const hasDeadwax = !quick && !coverOnly && !!imageSource(body.deadwax);
 
   // The label close-up goes in as an overview plus four magnified quadrants so
   // the etched matrix text is legible to the model. If tiling fails for any
@@ -118,6 +122,9 @@ export async function POST(req: NextRequest) {
     text:
       (quick
         ? "QUICK CHECK: only the front cover is attached. No back cover, disc or runout photos. Identify the release from the cover alone, set pressing_details.uncertainty and is_first_pressing from the cover, and set media_condition_a and media_condition_b to null. Do not guess grades. "
+        : "") +
+      (coverOnly
+        ? "COVER ONLY: there is no record in this sleeve, only the cover. Identify the release from the covers and any printed text. Set pressing_details.uncertainty to say the record itself was not inspected, set media_condition_a and media_condition_b to null, and do not grade any disc. "
         : "") +
       (sealed
         ? "SEALED COPY: the record is still shrink-wrapped, so no disc or runout photos are attached. Identify the release from the covers and any printed or sticker text only. Set pressing_details.sealed to true, set pressing_details.uncertainty to say the pressing was identified from the jacket alone, set media_condition_a and media_condition_b to null, and do not grade the discs. "

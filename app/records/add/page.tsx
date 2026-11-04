@@ -92,6 +92,8 @@ export default function AddRecordPage() {
   const [deadwax, setDeadwax] = useState<string | null>(null);
   // Sealed copies are still shrink-wrapped: value from the jacket, no disc photos.
   const [sealed, setSealed] = useState(false);
+  // Cover only: the sleeve with no record in it. Only the covers are needed.
+  const [coverOnly, setCoverOnly] = useState(false);
   // Disc photos: 2 per disc, indexed [disc0sideA, disc0sideB, disc1sideA, disc1sideB, ...]
   const [discPhotos, setDiscPhotos] = useState<Record<number, string>>({});
   const [status, setStatus] = useState<"idle" | "analyzing" | "saving">("idle");
@@ -209,7 +211,7 @@ export default function AddRecordPage() {
   const firstDiscA = discPhotos[0];
   const firstDiscB = discPhotos[1];
   // Need front cover + at least one disc side of the first disc.
-  const canAnalyze = !!front && (sealed || !!firstDiscA || !!firstDiscB) && status === "idle";
+  const canAnalyze = !!front && (sealed || coverOnly || !!firstDiscA || !!firstDiscB) && status === "idle";
 
   const discLabel = (idx: number) => {
     const disc = Math.floor(idx / 2) + 1;
@@ -270,9 +272,10 @@ export default function AddRecordPage() {
           front,
           back,
           sealed,
-          side_a: sealed ? undefined : firstDiscA,
-          side_b: sealed ? undefined : firstDiscB,
-          deadwax: !sealed && withDeadwax ? deadwax || undefined : undefined,
+          cover_only: coverOnly,
+          side_a: sealed || coverOnly ? undefined : firstDiscA,
+          side_b: sealed || coverOnly ? undefined : firstDiscB,
+          deadwax: !sealed && !coverOnly && withDeadwax ? deadwax || undefined : undefined,
         }),
       });
       let res = await askAi(true);
@@ -333,7 +336,7 @@ export default function AddRecordPage() {
         country: ai.country ?? null,
         genres: Array.isArray(ai.genres) && ai.genres.length ? ai.genres : null,
         // A sealed copy is not inspected, so store "M" rather than a grade from discs we never saw.
-        media_condition: toDbGrade(sealed ? "M" : mediaAvg),
+        media_condition: coverOnly ? null : toDbGrade(sealed ? "M" : mediaAvg),
         media_condition_a: ai.media_condition_a ? toDbGrade(ai.media_condition_a) : null,
         media_condition_b: ai.media_condition_b ? toDbGrade(ai.media_condition_b) : null,
         side_a_label: ai.side_a_label ?? null,
@@ -350,7 +353,9 @@ export default function AddRecordPage() {
         summary: ai.summary ?? null,
         condition_notes: ai.condition_notes ?? null,
         reasoning: ai.reasoning ?? null,
-        pressing_details: sealed
+        pressing_details: coverOnly
+          ? { ...(ai.pressing_details ?? {}), cover_only: true, runout_unread: false }
+          : sealed
           ? { ...(ai.pressing_details ?? {}), sealed: true, runout_unread: false }
           : ai.pressing_details
             ? { ...ai.pressing_details, runout_unread: runoutUnread }
@@ -528,7 +533,23 @@ export default function AddRecordPage() {
           : "Tap if the shrink wrap is still on. You won't need to open it."}
       </button>
 
-      {!sealed && (<>
+      {/* Cover only toggle: the sleeve has no record in it */}
+      <button
+        type="button"
+        onClick={() => setCoverOnly((c) => !c)}
+        aria-pressed={coverOnly}
+        className="w-full mb-6 px-4 py-3 rounded-2xl text-left text-sm"
+        style={{ background: coverOnly ? "rgba(201,162,39,0.12)" : "var(--wd-surface)", border: `1px solid ${coverOnly ? "var(--wd-gold)" : "var(--wd-border)"}`, color: "var(--wd-text)" }}
+      >
+        <span className="font-eyebrow text-[11px] block mb-1" style={{ color: coverOnly ? "var(--wd-gold)" : "var(--wd-text-faint)" }}>
+          {coverOnly ? "Cover only: on" : "Cover only, no record?"}
+        </span>
+        {coverOnly
+          ? "Valued from the sleeve. No disc or runout photos, and no media grade."
+          : "Tap if this sleeve has no record in it. Only the covers are needed."}
+      </button>
+
+      {!sealed && !coverOnly && (<>
       {/* Disc photos — 2 per disc, generated from disc count */}
       <p className="font-eyebrow text-[11px] mb-3" style={{ color: "var(--wd-text-faint)" }}>
         {discCount > 1 ? `Discs (${discCount} records, ${totalDiscSlots} photos)` : "Disc"}
@@ -578,7 +599,7 @@ export default function AddRecordPage() {
         Value it &amp; add to crate
       </button>
       <p className="text-center text-xs mt-3" style={{ color: "var(--wd-text-faint)" }}>
-        {sealed
+        {sealed || coverOnly
           ? "Front cover required · back cover optional"
           : "Front cover and at least one disc side required · back cover optional"}
         {!sealed && discCount > 1 ? ` · photograph all ${discCount} discs for your records` : ""}
