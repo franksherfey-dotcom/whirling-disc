@@ -19,16 +19,35 @@ export default function SharePage() {
   }, []);
 
   const loadCollaborators = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: cols } = await supabase.from("collections").select("id").eq("owner_id", user.id).limit(1);
-    const cid = cols?.[0]?.id;
-    if (!cid) return;
-    const { data } = await supabase
-      .from("collection_collaborators")
-      .select("user_id, role, approved_at")
-      .eq("collection_id", cid);
-    setCollaborators(data || []);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      if (!token) return;
+      const res = await fetch("/api/collaborators", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) { setCollaborators([]); return; } // not an owner/admin: no roster
+      const json = await res.json();
+      setCollaborators(json.collaborators || []);
+    } catch {
+      setCollaborators([]);
+    }
+  };
+
+  const removeCollaborator = async (userId: string, label: string) => {
+    if (typeof window !== "undefined" && !window.confirm(`Remove ${label} from this catalog? They'll lose access.`)) return;
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      const res = await fetch("/api/collaborators", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Could not remove");
+      loadCollaborators();
+    } catch (e) {
+      setError((e as Error).message);
+    }
   };
 
   const createInvite = async () => {
@@ -94,16 +113,34 @@ export default function SharePage() {
 
       {collaborators.length > 0 && (
         <div>
-          <p className="font-eyebrow text-xs mb-3" style={{ color: "var(--wd-text-faint)" }}>On this catalog</p>
+          <p className="font-eyebrow text-xs mb-1" style={{ color: "var(--wd-text-faint)" }}>On this catalog</p>
+          <p className="text-xs mb-3" style={{ color: "var(--wd-text-faint)" }}>
+            Only you (and app admins) can see this list. Collaborators can&rsquo;t see each other.
+          </p>
           <div className="space-y-2">
-            {collaborators.map((c, i) => (
-              <div key={i} className="flex items-center justify-between px-5 py-3 rounded-xl" style={{ background: "var(--wd-surface)", border: "1px solid var(--wd-border)" }}>
-                <span className="text-sm" style={{ color: "var(--wd-text)" }}>{c.user_id.slice(0, 8)}…</span>
-                <span className="font-eyebrow text-[10px]" style={{ color: c.approved_at ? "var(--wd-gold)" : "var(--wd-text-faint)" }}>
-                  {c.approved_at ? c.role : "pending"}
-                </span>
-              </div>
-            ))}
+            {collaborators.map((c) => {
+              const label = c.name || c.email || `${c.user_id.slice(0, 8)}…`;
+              return (
+                <div key={c.user_id} className="flex items-center justify-between gap-3 px-5 py-3 rounded-xl" style={{ background: "var(--wd-surface)", border: "1px solid var(--wd-border)" }}>
+                  <div className="min-w-0">
+                    <span className="text-sm truncate block" style={{ color: "var(--wd-text)" }}>
+                      {label}{c.is_you ? " (you)" : ""}
+                    </span>
+                    {c.email && c.name && <span className="text-xs truncate block" style={{ color: "var(--wd-text-faint)" }}>{c.email}</span>}
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="font-eyebrow text-[10px]" style={{ color: c.approved ? "var(--wd-gold)" : "var(--wd-text-faint)" }}>
+                      {c.approved ? c.role : "pending"}
+                    </span>
+                    {!c.is_you && (
+                      <button onClick={() => removeCollaborator(c.user_id, label)} className="font-eyebrow text-[10px] px-3 py-1 rounded-full" style={{ color: "var(--wd-red-bright, #e0503f)", border: "1px solid var(--wd-red, #b02418)" }}>
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
